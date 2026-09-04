@@ -1,0 +1,21 @@
+{
+  "name": "modzero",
+  "version": "0.1.0",
+  "private": true,
+  "description": "No moderator. Just proof. — permissionless content provenance & licensing protocol.",
+  "workspaces": [
+    "contracts",
+    "backend",
+    "agent",
+    "frontend"
+  ],
+  "scripts": {
+    "contracts:compile": "npm run compile --workspace=contracts",
+    "contracts:test": "npm run test --workspace=contracts",
+    "contracts:deploy": "npm run deploy --workspace=contracts",
+    "backend:dev": "npm run dev --workspace=backend",
+    "agent:dev": "npm run dev --workspace=agent",
+    "frontend:dev": "npm run dev --workspace=frontend"
+  },
+  "license": "MIT"
+}

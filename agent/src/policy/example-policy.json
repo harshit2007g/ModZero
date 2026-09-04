@@ -1,0 +1,19 @@
+{
+  "commercialUse": {
+    "allowed": true,
+    "price": "0.02 ETH"
+  },
+  "nonCommercialUse": {
+    "allowed": true,
+    "price": "0.002 ETH"
+  },
+  "modification": {
+    "allowed": true
+  },
+  "attribution": {
+    "required": true
+  },
+  "politicalUse": {
+    "allowed": false
+  }
+}
