@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 
 const router = Router();
@@ -21,8 +20,17 @@ const mockClaims: Record<string, any> = {
   },
 };
 
+/**
+ * POST /claim
+ * Real implementation checks provenance evidence + LicenseRegistry
+ * before allowing a claim, and only settles per explicit protocol rules
+ * (spec §26-28 — no automatic "creator says it, creator wins"). Mock
+ * version creates a claim in CREATED state so frontend can show the
+ * pending -> resolved flow.
+ */
 router.post("/claim", (req, res) => {
   const { contentId, rootContentId, subject } = req.body ?? {};
+
   const claimId = `mock-claim-${Date.now()}`;
   const fakeClaim = {
     claimId,
@@ -36,13 +44,19 @@ router.post("/claim", (req, res) => {
     resolvedAt: null,
     economicOutcome: null,
   };
+
   mockClaims[claimId] = fakeClaim;
   res.status(201).json(fakeClaim);
 });
 
+/**
+ * GET /claim/:id
+ */
 router.get("/claim/:id", (req, res) => {
   const record = mockClaims[req.params.id];
-  if (!record) return res.status(404).json({ error: "claim not found" });
+  if (!record) {
+    return res.status(404).json({ error: "claim not found" });
+  }
   res.json(record);
 });
 
