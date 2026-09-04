@@ -1,7 +1,6 @@
-# AI Development Rules
+#  Development Rules
 
-If you're an AI coding agent (Claude Code, Cursor, Copilot, etc.) working on
-this repo, follow these rules from `docs/SPEC.md` §38 without exception:
+If you're working on this repo, follow these rules from `docs/SPEC.md` §38 without exception:
 
 1. **Do not change the architecture** without explicit approval from a team
    member. The Ethereum/Hedera/ENS split in §6-7 is load-bearing — don't
