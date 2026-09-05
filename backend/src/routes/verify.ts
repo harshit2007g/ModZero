@@ -2,6 +2,8 @@ import { Router } from "express";
 import multer from "multer";
 import { computeDHash, detectWatermark, similarity } from "@modzero/watermark";
 import { contentStore } from "./content.js";
+import { checkValidLicenseOnChain } from "../services/blockchain.js";
+import { ethers } from "ethers";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -50,7 +52,8 @@ router.post("/verify", upload.single("image"), async (req, res) => {
 
     // hasValidLicense check needs LicenseRegistry wired up — TODO, defaults
     // to false so this never falsely clears someone (spec §27 caution).
-    const hasValidLicense = false;
+    const requester = (req.body?.requester as string) ?? ethers.ZeroAddress;
+    const hasValidLicense = bestMatch ? await checkValidLicenseOnChain(bestMatch.contentId, requester) : false;
 
     res.json({
       probableRootContentId: bestMatch?.contentId ?? null,
