@@ -1,57 +1,101 @@
 import { Router } from "express";
+import { ethers } from "ethers";
+import { issueLicenseOnChain } from "../services/blockchain.js";
 
 const router = Router();
 
-const mockLicenses: Record<string, any> = {
-  license123: {
-    licenseId: "license123",
-    contentId: "abc123",
-    creator: "0xA11ce00000000000000000000000000000000A",
-    licensee: "0xB0b0000000000000000000000000000000000B",
-    termsHash: "0xtermshashlicense123",
-    issuedAt: "2026-09-02T14:31:00.000Z",
-    expiresAt: null,
-    paymentReference: "x402:mockref123",
-  },
-};
+const AGENT_URL = process.env.AGENT_URL ?? "http://localhost:4001";
+
+const mockLicenses: Record<string, any> = {}; // still used as a local index/cache (spec §31)
 
 /**
  * POST /license/request
- * Real implementation forwards to the creator agent's /license/evaluate
- * (agent/), then on APPROVE drives the x402 payment flow and finally
- * calls LicenseRegistry.issueLicense (contracts/). Mock version always
- * approves so frontend can build the full happy-path UI now.
+ * Real flow per spec §19-21:
+ *  1. Forward the request to the creator agent for policy evaluation
+ *  2. If APPROVE, issue the license on-chain via LicenseRegistry
+ * NOTE: x402 payment verification is still a TODO — for now this issues
+ * the license immediately on APPROVE without a real payment step, which
+ * is a known gap to close before demo (spec §20 requires payment be
+ * independently verified first).
+ *
+ * Body: { contentId, requester, usage, intendsModification?, intendsPoliticalUse?, licensor }
  */
-router.post("/license/request", (req, res) => {
-  const { contentId, requester, usage } = req.body ?? {};
+router.post("/license/request", async (req, res) => {
+  try {
+    const { contentId, requester, usage, intendsModification, intendsPoliticalUse, licensor } = req.body ?? {};
 
-  const licenseId = `mock-license-${Date.now()}`;
-  const fakeLicense = {
-    licenseId,
-    contentId: contentId ?? "abc123",
-    creator: "0xA11ce00000000000000000000000000000000A",
-    licensee: requester ?? "0xMockRequester0000000000000000000000000",
-    termsHash: `0xmocktermshash${licenseId}`,
-    issuedAt: new Date().toISOString(),
-    expiresAt: null,
-    paymentReference: null, // real version fills this in once x402 payment is verified
-    decision: "APPROVE",
-    price: usage === "commercial" ? "0.02 ETH" : "0.002 ETH",
-    currency: "ETH",
-  };
+    if (!contentId || !requester || !usage) {
+      return res.status(400).json({ error: "contentId, requester, and usage are required" });
+    }
+    if (!ethers.isAddress(requester)) {
+      return res.status(400).json({ error: "requester must be a valid Ethereum address" });
+    }
 
-  mockLicenses[licenseId] = fakeLicense;
-  res.status(201).json(fakeLicense);
+    // Step 1 — ask the creator agent to evaluate against its policy
+    const agentResponse = await fetch(`${AGENT_URL}/license/evaluate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contentId,
+        requester,
+        usage,
+        intendsModification: !!intendsModification,
+        intendsPoliticalUse: !!intendsPoliticalUse,
+      }),
+    });
+
+    if (!agentResponse.ok) {
+      return res.status(502).json({ error: "creator agent unavailable" });
+    }
+
+    const decision = await agentResponse.json();
+
+    if (decision.decision !== "APPROVE") {
+      return res.status(403).json({ decision: "REJECT", reason: decision.reason });
+    }
+
+    // Step 2 — TODO: verify x402 payment here before issuing (spec §20).
+    // Skipped for now — known gap, must be closed before demo.
+
+    const licenseId = ethers.hexlify(ethers.randomBytes(32));
+    const termsHash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(decision.terms)));
+    const licensorAddress = licensor ?? "0x7fbc31df5d320D4dd7f877DDe5D880Aaf388E106"; // TODO: derive from content's registered creator
+    const expiresAt = 0; // no expiry for MVP
+
+    const ethereumTxHash = await issueLicenseOnChain(
+      licenseId,
+      contentId,
+      licensorAddress,
+      requester,
+      termsHash,
+      expiresAt
+    );
+
+    const record = {
+      licenseId,
+      contentId,
+      licensor: licensorAddress,
+      licensee: requester,
+      termsHash,
+      issuedAt: new Date().toISOString(),
+      expiresAt: null,
+      price: decision.price,
+      currency: decision.currency,
+      terms: decision.terms,
+      ethereumTxHash,
+    };
+
+    mockLicenses[licenseId] = record;
+    res.status(201).json(record);
+  } catch (err) {
+    console.error("[POST /license/request] failed:", err);
+    res.status(500).json({ error: "failed to process license request" });
+  }
 });
 
-/**
- * GET /license/:id
- */
 router.get("/license/:id", (req, res) => {
   const record = mockLicenses[req.params.id];
-  if (!record) {
-    return res.status(404).json({ error: "license not found" });
-  }
+  if (!record) return res.status(404).json({ error: "license not found" });
   res.json(record);
 });
 

@@ -10,6 +10,7 @@ import {
   generateContentId,
   generateCommitment,
 } from "@modzero/watermark";
+import { registerContentOnChain } from "../services/blockchain.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -49,7 +50,7 @@ router.post("/content", upload.single("image"), async (req, res) => {
     const watermarkMessage = `modzero:${contentId}`;
     const watermarkedBuffer = await embedWatermark(req.file.buffer, watermarkMessage);
 
-    const filename = `${contentId.slice(2, 18)}.png`; // strip 0x, keep it short
+    const filename = `${contentId.slice(2, 18)}.png`;
     writeFileSync(path.join(UPLOADS_DIR, filename), watermarkedBuffer);
     const mediaUri = `/media/${filename}`;
 
@@ -59,6 +60,10 @@ router.post("/content", upload.single("image"), async (req, res) => {
       contentId,
       metadata: ensName ?? "",
     });
+
+    // Real on-chain registration — this is a live Sepolia transaction and
+    // will take a few seconds to confirm.
+    const ethereumTxHash = await registerContentOnChain(contentId, commitment, parentContentId ?? null);
 
     const record = {
       contentId,
@@ -72,18 +77,18 @@ router.post("/content", upload.single("image"), async (req, res) => {
       commitment,
       createdAt: new Date().toISOString(),
       hederaSequence: null, // TODO: publish CONTENT_CREATED (hedera/publisher)
-      ethereumTxHash: null, // TODO: ContentRegistry.registerContent (contracts/)
+      ethereumTxHash,
       licenseStatus: "AVAILABLE",
       claimStatus: "NONE",
     };
 
     contentStore[contentId] = record;
-    secretStore[contentId] = secret; // kept server-side only, never in the API response
+    secretStore[contentId] = secret;
 
     res.status(201).json(record);
   } catch (err) {
     console.error("[POST /content] failed:", err);
-    res.status(500).json({ error: "failed to register content" });
+    res.status(500).json({ error: "failed to register content on-chain" });
   }
 });
 
