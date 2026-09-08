@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+build/
+frontend/dist/
+frontend/build/
+
+# Hardhat
+contracts/cache/
+contracts/artifacts/
+contracts/typechain/
+contracts/typechain-types/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Misc local data
+backend/database/*.sqlite
+uploads/
+tmp/
