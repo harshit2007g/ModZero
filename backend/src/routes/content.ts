@@ -1,8 +1,12 @@
-
 import { Router } from "express";
 
 const router = Router();
 
+/**
+ * Fake in-memory "database" so responses are at least self-consistent
+ * across requests during frontend development. Replace with real
+ * DB + indexer + contract reads per spec §30-31 in a later step.
+ */
 const mockContent: Record<string, any> = {
   abc123: {
     contentId: "abc123",
@@ -38,8 +42,16 @@ const mockContent: Record<string, any> = {
   },
 };
 
+/**
+ * POST /content
+ * Registers new content. Real implementation: fingerprint + watermark
+ * (watermark/), commitment (spec §12), Hedera CONTENT_CREATED event
+ * (hedera/publisher), ContentRegistry.registerContent (contracts/).
+ * For now: accepts the upload, returns a fake-but-shaped success response.
+ */
 router.post("/content", (req, res) => {
   const { ensName, mediaUri } = req.body ?? {};
+
   const contentId = `mock-${Date.now()}`;
   const fakeRecord = {
     contentId,
@@ -52,23 +64,36 @@ router.post("/content", (req, res) => {
     watermarkIdentifier: `wm:${contentId}`,
     commitment: `0xmockcommitment${contentId}`,
     createdAt: new Date().toISOString(),
-    hederaSequence: null,
-    ethereumTxHash: null,
+    hederaSequence: null, // not yet published — real version awaits HCS confirmation
+    ethereumTxHash: null, // not yet mined — real version awaits tx receipt
     licenseStatus: "AVAILABLE",
     claimStatus: "NONE",
   };
+
   mockContent[contentId] = fakeRecord;
   res.status(201).json(fakeRecord);
 });
 
+/**
+ * GET /content/:id
+ */
 router.get("/content/:id", (req, res) => {
   const record = mockContent[req.params.id];
-  if (!record) return res.status(404).json({ error: "content not found" });
+  if (!record) {
+    return res.status(404).json({ error: "content not found" });
+  }
   res.json(record);
 });
 
+/**
+ * GET /content/:id/graph
+ * Real implementation walks the indexer's provenance graph (spec §16-17).
+ * Mock version returns a small fixed graph so frontend/graph work can
+ * start immediately.
+ */
 router.get("/content/:id/graph", (req, res) => {
   const rootId = req.params.id;
+
   res.json({
     rootContentId: rootId,
     nodes: [
