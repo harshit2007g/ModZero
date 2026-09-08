@@ -10,7 +10,8 @@ import {
   generateContentId,
   generateCommitment,
 } from "@modzero/watermark";
-import { registerContentOnChain } from "../services/blockchain.js";
+import { registerContentOnChain, getContentOnChain } from "../services/blockchain.js";
+import { saveContent, getContentById } from "../database/contentRepo.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -19,23 +20,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, "..", "..", "uploads");
 mkdirSync(UPLOADS_DIR, { recursive: true });
 
-/**
- * In-memory index. Real version uses backend/database (spec §31) — this
- * still counts as "the database is an index/cache" per spec, just not
- * persistent yet. Secrets are kept OUT of this map and never returned
- * over the API (spec §12: "do NOT store plaintext secrets on-chain" —
- * extended here to "never expose over the API" either).
- */
-export const contentStore: Record<string, any> = {};
+// Secrets are kept OUT of the database response paths and never returned
+// over the API (spec §12).
 const secretStore: Record<string, string> = {};
 
-/**
- * POST /content  (multipart/form-data, field name: "image")
- * Real pipeline per spec §8: fingerprint -> secret -> watermark -> embed
- * -> store off-chain -> commitment. Hedera publish + Ethereum stake are
- * still TODO (next steps) — hederaSequence/ethereumTxHash stay null
- * until those are wired in.
- */
 router.post("/content", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
@@ -61,8 +49,6 @@ router.post("/content", upload.single("image"), async (req, res) => {
       metadata: ensName ?? "",
     });
 
-    // Real on-chain registration — this is a live Sepolia transaction and
-    // will take a few seconds to confirm.
     const ethereumTxHash = await registerContentOnChain(contentId, commitment, parentContentId ?? null);
 
     const record = {
@@ -76,40 +62,57 @@ router.post("/content", upload.single("image"), async (req, res) => {
       watermarkIdentifier: watermarkMessage,
       commitment,
       createdAt: new Date().toISOString(),
-      hederaSequence: null, // TODO: publish CONTENT_CREATED (hedera/publisher)
+      hederaSequence: null,
       ethereumTxHash,
-      licenseStatus: "AVAILABLE",
-      claimStatus: "NONE",
     };
 
-    contentStore[contentId] = record;
+    saveContent(record);
     secretStore[contentId] = secret;
 
-    res.status(201).json(record);
+    res.status(201).json({ ...record, licenseStatus: "AVAILABLE", claimStatus: "NONE" });
   } catch (err) {
     console.error("[POST /content] failed:", err);
     res.status(500).json({ error: "failed to register content on-chain" });
   }
 });
 
-router.get("/content/:id", (req, res) => {
-  const record = contentStore[req.params.id];
-  if (!record) return res.status(404).json({ error: "content not found" });
-  res.json(record);
+router.get("/content/:id", async (req, res) => {
+  const dbRecord = getContentById(req.params.id);
+  if (dbRecord) {
+    return res.json({ ...dbRecord, licenseStatus: "AVAILABLE", claimStatus: "NONE" });
+  }
+
+  // Fallback: not in our DB (e.g. registered from a different machine/session
+  // before persistence existed) — read the chain directly for at least the
+  // economically-relevant fields.
+  try {
+    const onChainRecord = await getContentOnChain(req.params.id);
+    if (!onChainRecord) return res.status(404).json({ error: "content not found" });
+
+    res.json({
+      ...onChainRecord,
+      ensName: null,
+      mediaUri: null,
+      fingerprint: null,
+      fingerprintAlgorithm: null,
+      watermarkIdentifier: null,
+      hederaSequence: null,
+      ethereumTxHash: null,
+      licenseStatus: "UNKNOWN",
+      claimStatus: "UNKNOWN",
+      _note: "Read from on-chain fallback — this content predates local DB persistence",
+    });
+  } catch (err) {
+    console.error("[GET /content/:id] on-chain fallback failed:", err);
+    res.status(404).json({ error: "content not found" });
+  }
 });
 
-/**
- * GET /content/:id/graph
- * Still mock — real version needs the Hedera indexer to actually exist
- * before there's provenance history to graph (spec §16-17). Next step.
- */
 router.get("/content/:id/graph", (req, res) => {
   const rootId = req.params.id;
   res.json({
     rootContentId: rootId,
-    nodes: [
-      { contentId: rootId, creator: "unknown", licenseStatus: "AVAILABLE", claimStatus: "NONE" },
-    ],
+    nodes: [{ contentId: rootId, creator: "unknown", licenseStatus: "AVAILABLE", claimStatus: "NONE" }],
     edges: [],
   });
 });

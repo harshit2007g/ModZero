@@ -116,3 +116,125 @@ export async function issueLicenseOnChain(
   const receipt = await tx.wait();
   return receipt.hash;
 }
+/**
+ * Reads a content record directly from ContentRegistry on-chain. Used as
+ * a fallback when the in-memory contentStore doesn't have it (e.g. after
+ * a backend restart) — the blockchain is always the source of truth
+ * (spec §31: "the database is an index/cache... blockchain/HCS remain
+ * the source of protocol truth").
+ *
+ * Note: on-chain storage only has creator/commitment/parentContentId/
+ * stake/timestamp — NOT fingerprint, watermark, or mediaUri, since those
+ * were never written on-chain (by design, spec §14 — media/fingerprints
+ * stay off-chain). So a chain-only fallback record will have those fields
+ * as null. This is a known, expected limitation, not a bug — full data
+ * requires the off-chain index/database (still TODO) to actually persist.
+ */
+export async function getContentOnChain(contentId: string) {
+  const result = await contentRegistry.getContent(contentId);
+  if (!result.exists) return null;
+  return {
+    contentId,
+    creatorAddress: result.creator,
+    commitment: result.commitment,
+    parentContentId: result.parentContentId === ethers.ZeroHash ? null : result.parentContentId,
+    stake: ethers.formatEther(result.stake),
+    createdAt: new Date(Number(result.registeredAt) * 1000).toISOString(),
+  };
+}
+const POST_REGISTRY_ABI = [
+  "function createPost(bytes32 postId, bytes32 textHash, bytes32 contentId) external payable",
+  "function getPost(bytes32 postId) external view returns (tuple(address creator, bytes32 textHash, bytes32 contentId, uint256 stake, uint64 createdAt, bool exists))",
+  "function minPostStake() external view returns (uint256)",
+];
+
+const CHALLENGE_REGISTRY_ABI = [
+  "function createChallenge(bytes32 challengeId, bytes32 postId, address creator) external payable",
+  "function vote(bytes32 challengeId, bool guilty) external",
+  "function resolveChallenge(bytes32 challengeId) external",
+  "function challenges(bytes32 challengeId) external view returns (bytes32 postId, address challenger, address creator, uint256 challengerStake, uint64 votingDeadline, uint256 votesGuilty, uint256 votesNotGuilty, uint8 state)",
+  "function getReputation(address creator) external view returns (int256)",
+  "function minChallengeStake() external view returns (uint256)",
+  "function hasVoted(bytes32 challengeId, address voter) external view returns (bool)",
+];
+
+export const postRegistry = new ethers.Contract(
+  process.env.POST_REGISTRY_ADDRESS as string,
+  POST_REGISTRY_ABI,
+  wallet
+);
+
+export const challengeRegistry = new ethers.Contract(
+  process.env.CHALLENGE_REGISTRY_ADDRESS as string,
+  CHALLENGE_REGISTRY_ABI,
+  wallet
+);
+
+export async function createPostOnChain(
+  postId: string,
+  textHash: string,
+  contentId: string | null
+): Promise<string> {
+  const minStake = await postRegistry.minPostStake();
+  const contentIdArg = contentId ?? ethers.ZeroHash;
+  const tx = await postRegistry.createPost(postId, textHash, contentIdArg, { value: minStake });
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+export async function getPostOnChain(postId: string) {
+  const result = await postRegistry.getPost(postId);
+  if (!result.exists) return null;
+  return {
+    postId,
+    creator: result.creator,
+    textHash: result.textHash,
+    contentId: result.contentId === ethers.ZeroHash ? null : result.contentId,
+    stake: ethers.formatEther(result.stake),
+    createdAt: new Date(Number(result.createdAt) * 1000).toISOString(),
+  };
+}
+
+export async function createChallengeOnChain(
+  challengeId: string,
+  postId: string,
+  creator: string
+): Promise<string> {
+  const minStake = await challengeRegistry.minChallengeStake();
+  const tx = await challengeRegistry.createChallenge(challengeId, postId, creator, { value: minStake });
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+export async function voteOnChallengeOnChain(challengeId: string, guilty: boolean): Promise<string> {
+  const tx = await challengeRegistry.vote(challengeId, guilty);
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+export async function resolveChallengeOnChain(challengeId: string): Promise<string> {
+  const tx = await challengeRegistry.resolveChallenge(challengeId);
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+const CHALLENGE_STATE_NAMES = ["NONE", "VOTING", "RESOLVED_GUILTY", "RESOLVED_NOT_GUILTY"];
+
+export async function getChallengeOnChain(challengeId: string) {
+  const result = await challengeRegistry.challenges(challengeId);
+  return {
+    postId: result.postId,
+    challenger: result.challenger,
+    creator: result.creator,
+    challengerStake: ethers.formatEther(result.challengerStake),
+    votingDeadline: Number(result.votingDeadline),
+    votesGuilty: Number(result.votesGuilty),
+    votesNotGuilty: Number(result.votesNotGuilty),
+    state: CHALLENGE_STATE_NAMES[Number(result.state)],
+  };
+}
+
+export async function getReputationOnChain(creator: string): Promise<number> {
+  const rep = await challengeRegistry.getReputation(creator);
+  return Number(rep);
+}

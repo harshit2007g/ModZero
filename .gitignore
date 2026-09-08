@@ -39,3 +39,4 @@ coverage/
 backend/database/*.sqlite
 uploads/
 tmp/
+backend/data/
