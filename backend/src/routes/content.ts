@@ -12,6 +12,7 @@ import {
 } from "@modzero/watermark";
 import { registerContentOnChain, getContentOnChain } from "../services/blockchain.js";
 import { saveContent, getContentById } from "../database/contentRepo.js";
+import { publishHcsEvent } from "../services/hedera.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -50,6 +51,16 @@ router.post("/content", upload.single("image"), async (req, res) => {
     });
 
     const ethereumTxHash = await registerContentOnChain(contentId, commitment, parentContentId ?? null);
+    const hederaSequence = await publishHcsEvent({
+  type: "CONTENT_CREATED",
+  version: 1,
+  contentId,
+  creator: creatorAddress ?? "0xUnknownCreator0000000000000000000000000",
+  ens: ensName ?? "",
+  fingerprintCommitment: commitment,
+  mediaUri,
+  timestamp: new Date().toISOString(),
+});
 
     const record = {
       contentId,
@@ -62,7 +73,7 @@ router.post("/content", upload.single("image"), async (req, res) => {
       watermarkIdentifier: watermarkMessage,
       commitment,
       createdAt: new Date().toISOString(),
-      hederaSequence: null,
+      hederaSequence,
       ethereumTxHash,
     };
 
