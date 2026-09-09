@@ -21,6 +21,9 @@ export default function Nav() {
           <Link to="/upload" className="text-paper-dim hover:text-paper transition-colors">
             Publish
           </Link>
+          <Link to="/feed" className="text-paper-dim hover:text-paper transition-colors">
+            Feed
+          </Link>
           <Link to="/dashboard" className="text-paper-dim hover:text-paper transition-colors">
             Dashboard
           </Link>
@@ -34,7 +37,7 @@ export default function Nav() {
           ) : (
             <button
               onClick={() => connect({ connector: connectors[0] })}
-             className="glow-btn text-xs px-3 py-1.5 rounded-full bg-gold text-ink-950 font-medium hover:bg-gold-bright transition-colors"
+              className="glow-btn text-xs px-3 py-1.5 rounded-full bg-gold text-ink-950 font-medium hover:bg-gold-bright transition-colors"
             >
               Connect wallet
             </button>

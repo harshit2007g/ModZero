@@ -12,6 +12,9 @@ import Dashboard from "./pages/Dashboard";
 import Content from "./pages/Content";
 import LicenseRequest from "./pages/LicenseRequest";
 import Claim from "./pages/Claim";
+import Feed from "./pages/Feed";
+import NewPost from "./pages/NewPost";
+import PostDetail from "./pages/PostDetail";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +29,9 @@ function AnimatedRoutes() {
         <Route path="/content/:id" element={<PageTransition><Content /></PageTransition>} />
         <Route path="/license/:contentId" element={<PageTransition><LicenseRequest /></PageTransition>} />
         <Route path="/claim/:id" element={<PageTransition><Claim /></PageTransition>} />
+        <Route path="/feed" element={<PageTransition><Feed /></PageTransition>} />
+        <Route path="/post/new" element={<PageTransition><NewPost /></PageTransition>} />
+        <Route path="/post/:id" element={<PageTransition><PostDetail /></PageTransition>} />
       </Routes>
     </AnimatePresence>
   );

@@ -121,3 +121,79 @@ export async function getClaim(claimId: string) {
   const res = await fetch(`${API_BASE}/claim/${claimId}`);
   return handle<ClaimRecord>(res);
 }
+export interface PostRecord {
+  postId: string;
+  creatorAddress: string;
+  text: string;
+  textHash: string;
+  contentId: string | null;
+  createdAt: string;
+  ethereumTxHash: string;
+  hederaSequence?: number;
+  creatorReputation?: number;
+}
+
+export interface ChallengeRecord {
+  challengeId: string;
+  postId: string;
+  challenger: string;
+  creator: string;
+  challengerStake: string;
+  votingDeadline: number;
+  votesGuilty: number;
+  votesNotGuilty: number;
+  state: string;
+  ethereumTxHash?: string;
+  hederaSequence?: number;
+}
+
+export async function createPost(text: string, creatorAddress: string, image?: File) {
+  const form = new FormData();
+  form.append("text", text);
+  form.append("creatorAddress", creatorAddress);
+  if (image) form.append("image", image);
+  const res = await fetch(`${API_BASE}/post`, { method: "POST", body: form });
+  return handle<PostRecord>(res);
+}
+
+export async function listPosts() {
+  const res = await fetch(`${API_BASE}/posts`);
+  return handle<PostRecord[]>(res);
+}
+
+export async function getPost(postId: string) {
+  const res = await fetch(`${API_BASE}/post/${postId}`);
+  return handle<PostRecord>(res);
+}
+
+export async function createChallenge(postId: string) {
+  const res = await fetch(`${API_BASE}/challenge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ postId }),
+  });
+  return handle<ChallengeRecord>(res);
+}
+
+export async function voteOnChallenge(challengeId: string, guilty: boolean) {
+  const res = await fetch(`${API_BASE}/challenge/${challengeId}/vote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ guilty }),
+  });
+  return handle<ChallengeRecord>(res);
+}
+
+export async function resolveChallenge(challengeId: string) {
+  const res = await fetch(`${API_BASE}/challenge/${challengeId}/resolve`, { method: "POST" });
+  return handle<ChallengeRecord>(res);
+}
+
+export async function getChallenge(challengeId: string) {
+  const res = await fetch(`${API_BASE}/challenge/${challengeId}`);
+  return handle<ChallengeRecord>(res);
+}
+export function mediaUrl(mediaUri: string | null): string | null {
+  if (!mediaUri) return null;
+  return `${API_BASE}${mediaUri}`;
+}
