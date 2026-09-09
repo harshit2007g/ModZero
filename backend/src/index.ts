@@ -9,6 +9,7 @@ import licenseRoutes from "./routes/license.js";
 import claimRoutes from "./routes/claim.js";
 import postRoutes from "./routes/post.js";
 import challengeRoutes from "./routes/challenge.js";
+import ensRoutes from "./routes/ens.js";
 
 dotenv.config({ path: "../.env" });
 
@@ -29,6 +30,7 @@ app.use(licenseRoutes);
 app.use(claimRoutes);
 app.use(postRoutes);
 app.use(challengeRoutes);
+app.use(ensRoutes);
 
 app.listen(PORT, () => {
   console.log(`[modzero-backend] listening on :${PORT}`);

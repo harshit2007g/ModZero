@@ -3,6 +3,7 @@ import multer from "multer";
 import { mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { resolveEnsName, lookupEnsName } from "../services/ens.js";
 import {
   computeDHash,
   embedWatermark,
@@ -31,6 +32,23 @@ router.post("/content", upload.single("image"), async (req, res) => {
       return res.status(400).json({ error: "multipart field 'image' is required" });
     }
     const { ensName, creatorAddress, parentContentId } = req.body ?? {};
+    // Resolve/verify ENS per spec §7. If the person typed a name, confirm it
+    // actually resolves to their claimed address — don't just trust free text.
+    // If they didn't type one, try a reverse lookup so the record still gets
+    // a real ENS name when the wallet has one set.
+    let verifiedEnsName: string | null = null;
+    if (ensName) {
+      const resolved = await resolveEnsName(ensName);
+      if (resolved && creatorAddress && resolved.toLowerCase() === creatorAddress.toLowerCase()) {
+        verifiedEnsName = ensName;
+      }
+      // If it doesn't resolve, or resolves to a different address, we don't
+      // trust the claim — verifiedEnsName stays null rather than silently
+      // accepting an unverified name (spec §29 legal-boundary spirit: don't
+      // assert identity we haven't actually checked).
+    } else if (creatorAddress) {
+      verifiedEnsName = await lookupEnsName(creatorAddress);
+    }
 
     const contentId = generateContentId();
     const secret = generateSecret();
@@ -52,20 +70,20 @@ router.post("/content", upload.single("image"), async (req, res) => {
 
     const ethereumTxHash = await registerContentOnChain(contentId, commitment, parentContentId ?? null);
     const hederaSequence = await publishHcsEvent({
-  type: "CONTENT_CREATED",
-  version: 1,
-  contentId,
-  creator: creatorAddress ?? "0xUnknownCreator0000000000000000000000000",
-  ens: ensName ?? "",
-  fingerprintCommitment: commitment,
-  mediaUri,
-  timestamp: new Date().toISOString(),
-});
+      type: "CONTENT_CREATED",
+      version: 1,
+      contentId,
+      creator: creatorAddress ?? "0xUnknownCreator0000000000000000000000000",
+      ens: ensName ?? "",
+      fingerprintCommitment: commitment,
+      mediaUri,
+      timestamp: new Date().toISOString(),
+    });
 
     const record = {
       contentId,
       creatorAddress: creatorAddress ?? "0xUnknownCreator0000000000000000000000000",
-      ensName: ensName ?? null,
+      ensName: verifiedEnsName,
       parentContentId: parentContentId ?? null,
       mediaUri,
       fingerprint,
