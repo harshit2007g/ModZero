@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import { mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { publishHcsEvent } from "../services/hedera.js";
 import {
   computeDHash,
   embedWatermark,
@@ -79,6 +80,15 @@ router.post("/post", upload.single("image"), async (req, res) => {
     const textHash = ethers.keccak256(ethers.toUtf8Bytes(text));
 
     const ethereumTxHash = await createPostOnChain(postId, textHash, contentId);
+    const hederaSequence = await publishHcsEvent({
+      type: "POST_CREATED",
+      version: 1,
+      postId,
+      creator: creatorAddress,
+      textHash,
+      contentId,
+      timestamp: new Date().toISOString(),
+    });
 
     const record = {
       postId,
@@ -88,7 +98,9 @@ router.post("/post", upload.single("image"), async (req, res) => {
       contentId,
       createdAt: new Date().toISOString(),
       ethereumTxHash,
+      hederaSequence,
     };
+
 
     savePost(record);
     res.status(201).json(record);

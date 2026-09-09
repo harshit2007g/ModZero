@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { ethers } from "ethers";
 import { createClaimOnChain, getClaimOnChain } from "../services/blockchain.js";
+import { publishHcsEvent } from "../services/hedera.js";
 
 const router = Router();
 
@@ -32,7 +33,19 @@ router.post("/claim", async (req, res) => {
       evidenceHash ?? ethers.keccak256(ethers.toUtf8Bytes(`${contentId}:${rootContentId}:${subject}`));
 
     const ethereumTxHash = await createClaimOnChain(claimId, contentId, rootContentId, subject, finalEvidenceHash);
+
     const onChainClaim = await getClaimOnChain(claimId);
+    const hederaSequence = await publishHcsEvent({
+      type: "CLAIM_CREATED",
+      version: 1,
+      claimId,
+      contentId,
+      rootContentId,
+      claimant: onChainClaim.claimant,
+      subject,
+      evidenceHash: finalEvidenceHash,
+      timestamp: new Date().toISOString(),
+    });
 
     res.status(201).json({
       claimId,

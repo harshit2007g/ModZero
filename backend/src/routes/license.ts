@@ -2,6 +2,7 @@ import { Router } from "express";
 import { ethers } from "ethers";
 import { issueLicenseOnChain } from "../services/blockchain.js";
 import { saveLicense, getLicenseById } from "../database/licenseRepo.js";
+import { publishHcsEvent } from "../services/hedera.js";
 
 const router = Router();
 
@@ -55,6 +56,16 @@ router.post("/license/request", async (req, res) => {
       termsHash,
       expiresAt
     );
+    const hederaSequence = await publishHcsEvent({
+      type: "LICENSE_CREATED",
+      version: 1,
+      contentId,
+      licenseId,
+      licensor: licensorAddress,
+      licensee: requester,
+      termsHash,
+      timestamp: new Date().toISOString(),
+    });
 
     const record = {
       licenseId,
@@ -68,9 +79,11 @@ router.post("/license/request", async (req, res) => {
       currency: decision.currency,
       termsJson: JSON.stringify(decision.terms),
       ethereumTxHash,
+      hederaSequence,
     };
 
-    saveLicense(record);
+    const { hederaSequence: _hs, ...dbRecord } = record;
+    saveLicense(dbRecord);
     res.status(201).json({ ...record, terms: decision.terms });
   } catch (err) {
     console.error("[POST /license/request] failed:", err);

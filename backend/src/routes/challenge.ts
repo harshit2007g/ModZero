@@ -7,6 +7,7 @@ import {
   getChallengeOnChain,
 } from "../services/blockchain.js";
 import { getPostById } from "../database/postRepo.js";
+import { publishHcsEvent } from "../services/hedera.js";
 
 const router = Router();
 
@@ -29,7 +30,17 @@ router.post("/challenge", async (req, res) => {
     const ethereumTxHash = await createChallengeOnChain(challengeId, postId, post.creatorAddress);
     const onChainChallenge = await getChallengeOnChain(challengeId);
 
-    res.status(201).json({ challengeId, ...onChainChallenge, ethereumTxHash });
+    const hederaSequence = await publishHcsEvent({
+      type: "CHALLENGE_CREATED",
+      version: 1,
+      challengeId,
+      postId,
+      challenger: onChainChallenge.challenger,
+      creator: post.creatorAddress,
+      timestamp: new Date().toISOString(),
+    });
+
+    res.status(201).json({ challengeId, ...onChainChallenge, ethereumTxHash, hederaSequence });
   } catch (err) {
     console.error("[POST /challenge] failed:", err);
     res.status(500).json({ error: "failed to create challenge" });
@@ -66,7 +77,16 @@ router.post("/challenge/:id/resolve", async (req, res) => {
   try {
     const ethereumTxHash = await resolveChallengeOnChain(req.params.id);
     const onChainChallenge = await getChallengeOnChain(req.params.id);
-    res.json({ challengeId: req.params.id, ...onChainChallenge, ethereumTxHash });
+
+    const hederaSequence = await publishHcsEvent({
+      type: "CHALLENGE_RESOLVED",
+      version: 1,
+      challengeId: req.params.id,
+      outcome: onChainChallenge.state === "RESOLVED_GUILTY" ? "GUILTY" : "NOT_GUILTY",
+      timestamp: new Date().toISOString(),
+    });
+
+    res.json({ challengeId: req.params.id, ...onChainChallenge, ethereumTxHash, hederaSequence });
   } catch (err) {
     console.error("[POST /challenge/:id/resolve] failed:", err);
     res.status(500).json({ error: err instanceof Error ? err.message : "failed to resolve challenge" });
