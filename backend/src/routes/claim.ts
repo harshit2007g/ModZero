@@ -51,6 +51,7 @@ router.post("/claim", async (req, res) => {
       claimId,
       ...onChainClaim,
       ethereumTxHash,
+      hederaSequence,
     });
   } catch (err) {
     console.error("[POST /claim] failed:", err);
