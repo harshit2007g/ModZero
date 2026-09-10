@@ -245,3 +245,38 @@ export async function resolveClaimOnChain(claimId: string, outcome: "VALID" | "I
   const receipt = await tx.wait();
   return receipt.hash;
 }
+/**
+ * Verifies a claimed payment transaction actually satisfies the license
+ * terms before issuance — the real check spec §20 requires ("payment must
+ * be independently verified", not trusted because a client claims it
+ * happened). Minimal x402-style flow: no formal x402 handshake headers,
+ * but the core guarantee (verify on-chain before granting access) is real.
+ */
+export async function verifyPaymentOnChain(
+  txHash: string,
+  expectedTo: string,
+  expectedFrom: string,
+  minValueWei: bigint
+): Promise<{ valid: boolean; reason?: string }> {
+  const tx = await provider.getTransaction(txHash);
+  if (!tx) return { valid: false, reason: "transaction not found" };
+
+  const receipt = await provider.getTransactionReceipt(txHash);
+  if (!receipt || receipt.status !== 1) {
+    return { valid: false, reason: "transaction not confirmed or failed" };
+  }
+
+  if (!tx.to || tx.to.toLowerCase() !== expectedTo.toLowerCase()) {
+    return { valid: false, reason: "payment sent to the wrong address" };
+  }
+
+  if (tx.from.toLowerCase() !== expectedFrom.toLowerCase()) {
+    return { valid: false, reason: "payment sender does not match the requester" };
+  }
+
+  if (tx.value < minValueWei) {
+    return { valid: false, reason: "payment amount is insufficient" };
+  }
+
+  return { valid: true };
+}
