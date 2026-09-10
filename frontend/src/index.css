@@ -1,27 +1,54 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+/*
+ * ModZero design system.
+ *
+ * Light, but not blank. The page is a warm off-white with tinted bands, a soft
+ * colour bloom behind the hero, and a faint dot grid for texture — white is a
+ * card colour here, not the page colour.
+ *
+ * Type floor is 16px. Body is 20px.
+ */
 
-  --color-ink-950: #0a0a12;
-  --color-ink-900: #12121e;
-  --color-ink-800: #1a1a2e;
-  --color-ink-700: #26263e;
-  --color-ink-600: #3a3a5c;
-  --color-paper: #f2f1fb;
-  --color-paper-dim: #a3a1c4;
-  --color-gold: #8b7cf6;
-  --color-gold-bright: #a996ff;
-  --color-signal-green: #4ade80;
-  --color-signal-amber: #fbbf24;
-  --color-signal-red: #f87171;
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* surfaces */
+  --color-page: #fbfaff;
+  --color-card: #ffffff;
+  --color-band: #f4f2ff;
+  --color-band2: #eef7fb;
+  --color-line: #e6e3f5;
+
+  /* ink */
+  --color-navy: #12103a;
+  --color-slate: #4a4870;
+  --color-muted: #7b789e;
+
+  /* accent */
+  --color-brand: #5b53ff;
+  --color-brand-soft: #eeecff;
+  --color-sky: #00b0d8;
+  --color-rose: #ff4f8b;
+  --color-mint: #05a37a;
+  --color-flag: #e03b45;
+  --color-sun: #cf7c07;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background-color: var(--color-ink-950);
-  color: var(--color-paper);
+  margin: 0;
+  background-color: var(--color-page);
+  color: var(--color-navy);
   font-family: var(--font-sans);
+  font-size: 20px;
+  line-height: 1.6;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
@@ -29,87 +56,137 @@ body {
   font-family: var(--font-mono);
 }
 
-.hairline {
-  border-color: var(--color-ink-600);
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
 }
 
-::selection {
-  background-color: var(--color-gold);
-  color: var(--color-ink-950);
-}
+/* ── Background texture ───────────────────────────────────────── */
 
-/* Animated aurora background — sits fixed behind all pages */
-.aurora-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.aurora-blob {
+/* Big soft colour bloom. Sits behind the hero and any section that wants it. */
+.bloom {
   position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.35;
-  animation: drift 22s ease-in-out infinite;
+  inset: -30% -10% auto -10%;
+  height: 900px;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(38% 46% at 20% 24%, rgba(91, 83, 255, 0.30), transparent 68%),
+    radial-gradient(34% 42% at 78% 12%, rgba(0, 176, 216, 0.26), transparent 68%),
+    radial-gradient(32% 40% at 58% 46%, rgba(255, 79, 139, 0.20), transparent 70%);
+  filter: blur(40px);
 }
 
-.aurora-blob.one {
-  width: 480px;
-  height: 480px;
-  background: #8b7cf6;
-  top: -10%;
-  left: -5%;
-  animation-duration: 26s;
+/* Faint dot grid — gives the page a surface instead of a void. */
+.dots {
+  background-image: radial-gradient(rgba(18, 16, 58, 0.09) 1px, transparent 1px);
+  background-size: 26px 26px;
 }
 
-.aurora-blob.two {
-  width: 420px;
-  height: 420px;
-  background: #22d3ee;
-  top: 30%;
-  right: -10%;
-  animation-duration: 30s;
-  animation-delay: -6s;
+.band {
+  background: var(--color-band);
+}
+.band-2 {
+  background: var(--color-band2);
 }
 
-.aurora-blob.three {
-  width: 360px;
-  height: 360px;
-  background: #f472b6;
-  bottom: -15%;
-  left: 20%;
-  animation-duration: 24s;
-  animation-delay: -12s;
+/* ── Cards ───────────────────────────────────────────────────── */
+
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 24px;
+  box-shadow:
+    0 1px 2px rgba(18, 16, 58, 0.04),
+    0 12px 28px -18px rgba(18, 16, 58, 0.28);
+  transition:
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.4s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  border-color: #cfc9f5;
+  box-shadow:
+    0 2px 4px rgba(18, 16, 58, 0.05),
+    0 30px 60px -28px rgba(91, 83, 255, 0.45);
+}
+
+.card-hover img {
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-hover:hover img {
+  transform: scale(1.03);
+}
+
+.grad-text {
+  background: linear-gradient(100deg, #5b53ff 0%, #00b0d8 50%, #ff4f8b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Motion ──────────────────────────────────────────────────── */
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.4deg);
+  }
+  50% {
+    transform: translateY(-16px) rotate(-0.4deg);
+  }
+}
+.float {
+  animation: float 7s ease-in-out infinite;
 }
 
 @keyframes drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(60px, -40px) scale(1.1); }
-  66% { transform: translate(-40px, 50px) scale(0.95); }
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, -3%, 0) scale(1.06);
+  }
+}
+.drift {
+  animation: drift 18s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 200% 50%;
+  }
+}
+.shimmer {
+  background-size: 200% 200%;
+  animation: shimmer 6s linear infinite;
+}
+
+::selection {
+  background-color: rgba(91, 83, 255, 0.22);
+}
+
+*::-webkit-scrollbar {
+  width: 13px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #cfc9f5;
+  border-radius: 99px;
+  border: 4px solid var(--color-page);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .aurora-blob { animation: none; }
-}
-
-/* Glass panel — replaces flat bordered boxes */
-.glass {
-  background: rgba(26, 26, 46, 0.55);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(139, 124, 246, 0.18);
-}
-
-.glow-btn {
-  transition: box-shadow 0.25s ease, transform 0.15s ease;
-}
-
-.glow-btn:hover {
-  box-shadow: 0 0 24px rgba(139, 124, 246, 0.45);
-  transform: translateY(-1px);
-}
-
-.glow-btn:active {
-  transform: translateY(0);
+  .float,
+  .drift,
+  .shimmer {
+    animation: none;
+  }
 }
