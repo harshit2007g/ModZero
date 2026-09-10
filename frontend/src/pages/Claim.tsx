@@ -1,67 +1,85 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { getClaim, type ClaimRecord } from "../lib/api";
-
-const stateColor: Record<string, string> = {
-  CREATED: "text-signal-amber",
-  EVIDENCE_SUBMITTED: "text-signal-amber",
-  RESOLVED_VALID: "text-signal-red",
-  RESOLVED_INVALID: "text-signal-green",
-};
+import { Link, useParams } from "react-router-dom";
+import { Avatar, Card, ErrorNote, Loading, Pill, Row, timeAgo, truncateAddress } from "../components/ui";
+import { getClaim } from "../lib/client";
+import type { ClaimRecord } from "../lib/api";
+import { useSeo } from "../components/seo/Seo";
+import Breadcrumbs from "../components/layout/Breadcrumbs";
 
 export default function Claim() {
+  useSeo({
+    title: "Claim",
+    description: "An on-chain provenance claim between two ModZero works.",
+    noIndex: true,
+  });
+
   const { id } = useParams<{ id: string }>();
   const [claim, setClaim] = useState<ClaimRecord | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
-    if (!id) return;
-    getClaim(id)
-      .then(setClaim)
-      .catch((err) => setError(err.message));
+    if (id) getClaim(id).then(setClaim).catch(setError);
   }, [id]);
 
-  if (error) return <div className="mx-auto max-w-2xl px-6 py-16 text-signal-red">{error}</div>;
-  if (!claim) return <div className="mx-auto max-w-2xl px-6 py-16 text-paper-dim">Loading…</div>;
+  if (error) return <div className="mx-auto max-w-[760px] px-8 py-20"><ErrorNote error={error} /></div>;
+  if (!claim) return <div className="mx-auto max-w-[760px] px-8 py-20"><Loading label="Loading claim" /></div>;
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="text-3xl font-semibold tracking-tight">Claim</h1>
-      <p className={`mt-2 font-mono text-sm ${stateColor[claim.state] ?? "text-paper-dim"}`}>{claim.state}</p>
-
-      <div className="mt-8">
-        <div className="flex justify-between py-3 border-b hairline text-sm">
-          <span className="text-paper-dim">Claim ID</span>
-          <span className="font-mono text-xs break-all text-right">{claim.claimId}</span>
-        </div>
-        <div className="flex justify-between py-3 border-b hairline text-sm">
-          <span className="text-paper-dim">Root content</span>
-          <span className="font-mono text-xs break-all text-right">{claim.rootContentId}</span>
-        </div>
-        <div className="flex justify-between py-3 border-b hairline text-sm">
-          <span className="text-paper-dim">Subject</span>
-          <span className="font-mono text-xs break-all text-right">{claim.subject}</span>
-        </div>
-        <div className="flex justify-between py-3 border-b hairline text-sm">
-          <span className="text-paper-dim">Claimant</span>
-          <span className="font-mono text-xs break-all text-right">{claim.claimant}</span>
-        </div>
-        <div className="flex justify-between py-3 border-b hairline text-sm">
-          <span className="text-paper-dim">Evidence hash</span>
-          <span className="font-mono text-xs break-all text-right">{claim.evidenceHash}</span>
-        </div>
+    <div className="mx-auto max-w-[760px] px-8 py-16">
+      <Breadcrumbs items={[{ name: "Feed", path: "/" }, { name: "Claim" }]} />
+      <div className="flex flex-wrap items-center gap-5">
+        <h1 className="text-[clamp(36px,4.6vw,52px)] font-bold tracking-[-0.03em] text-navy">Claim</h1>
+        <Pill tone={claim.state === "OPEN" ? "sun" : "neutral"}>{claim.state}</Pill>
       </div>
+      <p className="mt-6 max-w-2xl text-[20px] leading-relaxed text-slate">
+        A claim asserts who published first. It is not a ruling on copyright, and opening one
+        settles nothing by itself.
+      </p>
 
-      {claim.ethereumTxHash && (
-        
-         <a href={`https://sepolia.etherscan.io/tx/${claim.ethereumTxHash}`}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-6 inline-block text-gold hover:text-gold-bright font-mono text-xs"
-        >
-          View on Sepolia Etherscan →
-        </a>
-      )}
+      <Card className="mt-10 p-8">
+        <div className="flex flex-wrap items-center gap-8">
+          <div className="flex items-center gap-4">
+            <Avatar seed={claim.claimant} size={52} />
+            <div>
+              <p className="text-[17px] text-muted">Claimant</p>
+              <p className="font-mono text-[18px] font-semibold text-navy">
+                {truncateAddress(claim.claimant)}
+              </p>
+            </div>
+          </div>
+          <span className="text-[18px] text-muted">vs</span>
+          <div className="flex items-center gap-4">
+            <Avatar seed={claim.subject} size={52} />
+            <div>
+              <p className="text-[17px] text-muted">Subject</p>
+              <p className="font-mono text-[18px] font-semibold text-navy">
+                {truncateAddress(claim.subject)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-wrap gap-6 border-t border-line pt-6 text-[18px]">
+          <Link to={`/content/${claim.rootContentId}`} className="font-semibold text-brand hover:underline">
+            Original work
+          </Link>
+          <Link to={`/content/${claim.contentId}`} className="font-semibold text-brand hover:underline">
+            Disputed upload
+          </Link>
+          <span className="text-muted">Opened {timeAgo(claim.createdAt)}</span>
+        </div>
+      </Card>
+
+      <details className="mt-10 rounded-2xl border border-line px-7 py-5">
+        <summary className="cursor-pointer text-[17px] font-semibold text-slate">
+          Technical record
+        </summary>
+        <dl className="mt-4">
+          <Row label="Claim ID" value={claim.claimId} mono />
+          <Row label="Evidence hash" value={claim.evidenceHash} mono />
+          {claim.ethereumTxHash && <Row label="Ethereum transaction" value={claim.ethereumTxHash} mono />}
+        </dl>
+      </details>
     </div>
   );
 }
