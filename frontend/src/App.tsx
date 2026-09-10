@@ -1,54 +1,63 @@
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { Suspense, lazy } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { wagmiConfig } from "./lib/wagmi";
-import Nav from "./components/Nav";
-import AuroraBackground from "./components/AuroraBackground";
-import PageTransition from "./components/PageTransition";
-import Landing from "./pages/Landing";
-import Upload from "./pages/Upload";
-import Dashboard from "./pages/Dashboard";
-import Content from "./pages/Content";
-import LicenseRequest from "./pages/LicenseRequest";
-import Claim from "./pages/Claim";
+import Shell from "./components/layout/Shell";
 import Feed from "./pages/Feed";
-import NewPost from "./pages/NewPost";
-import PostDetail from "./pages/PostDetail";
+import { Loading } from "./components/ui";
 
-const queryClient = new QueryClient();
+/* The feed is the entry point so it stays in the main bundle. Everything else
+   is split out — it cuts the initial download roughly in half. */
+const Compose = lazy(() => import("./pages/Compose"));
+const PostDetail = lazy(() => import("./pages/PostDetail"));
+const Verify = lazy(() => import("./pages/Verify"));
+const Content = lazy(() => import("./pages/Content"));
+const LicenseRequest = lazy(() => import("./pages/LicenseRequest"));
+const Claim = lazy(() => import("./pages/Claim"));
+const Profile = lazy(() => import("./pages/Profile"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
-function AnimatedRoutes() {
-  const location = useLocation();
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { refetchOnWindowFocus: false } },
+});
+
+function Fallback() {
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<PageTransition><Landing /></PageTransition>} />
-        <Route path="/upload" element={<PageTransition><Upload /></PageTransition>} />
-        <Route path="/dashboard" element={<PageTransition><Dashboard /></PageTransition>} />
-        <Route path="/content/:id" element={<PageTransition><Content /></PageTransition>} />
-        <Route path="/license/:contentId" element={<PageTransition><LicenseRequest /></PageTransition>} />
-        <Route path="/claim/:id" element={<PageTransition><Claim /></PageTransition>} />
-        <Route path="/feed" element={<PageTransition><Feed /></PageTransition>} />
-        <Route path="/post/new" element={<PageTransition><NewPost /></PageTransition>} />
-        <Route path="/post/:id" element={<PageTransition><PostDetail /></PageTransition>} />
-      </Routes>
-    </AnimatePresence>
+    <div className="mx-auto max-w-[1440px] px-8">
+      <Loading />
+    </div>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <AuroraBackground />
-          <Nav />
-          <AnimatedRoutes />
+          <Suspense fallback={<Fallback />}>
+            <Routes>
+              <Route element={<Shell />}>
+                <Route path="/" element={<Feed />} />
+                <Route path="/compose" element={<Compose />} />
+                <Route path="/post/:id" element={<PostDetail />} />
+                <Route path="/verify" element={<Verify />} />
+                <Route path="/content/:id" element={<Content />} />
+                <Route path="/license/:contentId" element={<LicenseRequest />} />
+                <Route path="/claim/:id" element={<Claim />} />
+                <Route path="/u/:address" element={<Profile />} />
+                <Route path="/studio" element={<Profile />} />
+                {/* older paths, kept so existing links resolve */}
+                <Route path="/feed" element={<Navigate to="/" replace />} />
+                <Route path="/post/new" element={<Navigate to="/compose" replace />} />
+                <Route path="/upload" element={<Navigate to="/compose" replace />} />
+                <Route path="/dashboard" element={<Navigate to="/studio" replace />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </QueryClientProvider>
     </WagmiProvider>
   );
 }
-
-export default App;
