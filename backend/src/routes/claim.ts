@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { ethers } from "ethers";
-import { createClaimOnChain, getClaimOnChain } from "../services/blockchain.js";
+import { createClaimOnChain, getClaimOnChain, resolveClaimOnChain } from "../services/blockchain.js";
 import { publishHcsEvent } from "../services/hedera.js";
 
 const router = Router();
@@ -74,6 +74,39 @@ router.get("/claim/:id", async (req, res) => {
   } catch (err) {
     console.error("[GET /claim/:id] failed:", err);
     res.status(500).json({ error: "failed to read claim" });
+  }
+});
+/**
+ * POST /claim/:id/resolve
+ * Body: { outcome: "VALID" | "INVALID" }
+ * Permissionless in principle, but for demo purposes anyone can call this
+ * directly rather than requiring a real arbitration mechanism (spec §26 —
+ * explicitly allowed to be a simplified "protocol-enforced evidence
+ * pipeline" for MVP, not full trustless arbitration).
+ * On VALID, this triggers real on-chain stake slashing to the claimant.
+ */
+router.post("/claim/:id/resolve", async (req, res) => {
+  try {
+    const { outcome } = req.body ?? {};
+    if (outcome !== "VALID" && outcome !== "INVALID") {
+      return res.status(400).json({ error: "outcome must be VALID or INVALID" });
+    }
+
+    const ethereumTxHash = await resolveClaimOnChain(req.params.id, outcome);
+    const onChainClaim = await getClaimOnChain(req.params.id);
+
+    const hederaSequence = await publishHcsEvent({
+      type: "CLAIM_RESOLVED",
+      version: 1,
+      claimId: req.params.id,
+      outcome,
+      timestamp: new Date().toISOString(),
+    });
+
+    res.json({ claimId: req.params.id, ...onChainClaim, ethereumTxHash, hederaSequence });
+  } catch (err) {
+    console.error("[POST /claim/:id/resolve] failed:", err);
+    res.status(500).json({ error: err instanceof Error ? err.message : "failed to resolve claim" });
   }
 });
 

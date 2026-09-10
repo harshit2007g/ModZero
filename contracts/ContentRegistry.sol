@@ -32,6 +32,46 @@ contract ContentRegistry is ReentrancyGuard, Ownable {
         bytes32 parentContentId,
         uint256 stake
     );
+        address public claimRegistry;
+
+    event StakeSlashed(bytes32 indexed contentId, address indexed recipient, uint256 amount);
+
+    modifier onlyClaimRegistry() {
+        require(msg.sender == claimRegistry, "caller is not the authorized ClaimRegistry");
+        _;
+    }
+
+    /// @notice Sets which ClaimRegistry instance is authorized to slash
+    ///         stakes. Owner-only, set once after both contracts deploy
+    ///         (chicken-and-egg: ContentRegistry deploys first).
+    function setClaimRegistry(address _claimRegistry) external onlyOwner {
+        claimRegistry = _claimRegistry;
+    }
+
+    /// @notice Transfers a registered content's stake to `recipient`.
+    ///         Callable ONLY by the authorized ClaimRegistry, and only as
+    ///         part of a resolved, evidence-backed claim (spec §26-28) —
+    ///         never by a bare assertion. Zeroes the stake first
+    ///         (checks-effects-interactions) so it can't be slashed twice.
+    function slashStake(bytes32 contentId, address payable recipient)
+        external
+        onlyClaimRegistry
+        nonReentrant
+        returns (uint256)
+    {
+        Content storage c = contents[contentId];
+        require(c.exists, "content not found");
+        uint256 amount = c.stake;
+        require(amount > 0, "no stake to slash");
+
+        c.stake = 0;
+
+        (bool success, ) = recipient.call{value: amount}("");
+        require(success, "stake transfer failed");
+
+        emit StakeSlashed(contentId, recipient, amount);
+        return amount;
+    }
 
     event StakeWithdrawn(bytes32 indexed contentId, address indexed creator, uint256 amount);
 

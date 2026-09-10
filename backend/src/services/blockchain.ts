@@ -17,6 +17,7 @@ const LICENSE_REGISTRY_ABI = [
 const CLAIM_REGISTRY_ABI = [
   "function createClaim(bytes32 claimId, bytes32 contentId, bytes32 rootContentId, address subject, bytes32 evidenceHash) external",
   "function claims(bytes32 claimId) external view returns (bytes32 contentId, bytes32 rootContentId, address claimant, address subject, bytes32 evidenceHash, uint8 state, uint64 createdAt)",
+  "function resolveClaim(bytes32 claimId, uint8 outcome) external",
 ];
 
 const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
@@ -237,4 +238,10 @@ export async function getChallengeOnChain(challengeId: string) {
 export async function getReputationOnChain(creator: string): Promise<number> {
   const rep = await challengeRegistry.getReputation(creator);
   return Number(rep);
+}
+export async function resolveClaimOnChain(claimId: string, outcome: "VALID" | "INVALID"): Promise<string> {
+  const outcomeEnum = outcome === "VALID" ? 3 : 4; // matches ClaimRegistry.ClaimState
+  const tx = await claimRegistry.resolveClaim(claimId, outcomeEnum);
+  const receipt = await tx.wait();
+  return receipt.hash;
 }
