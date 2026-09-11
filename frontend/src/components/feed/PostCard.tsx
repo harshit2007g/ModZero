@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect,useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import type { ContentRecord, PostRecord } from "../../lib/api";
+import type { ContentRecord,PostRecord } from "../../lib/api";
 import { getContent, imageFor } from "../../lib/client";
 import { Avatar, Card, Pill, timeAgo, truncateAddress } from "../ui";
 
