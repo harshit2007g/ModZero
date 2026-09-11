@@ -5,7 +5,7 @@ export default function Breadcrumbs({ items }: { items: Array<{ name: string; pa
   return (
     <nav aria-label="Breadcrumb" className="mb-8">
       <ol className="flex flex-wrap items-center gap-2 text-[17px] text-muted">
-        {items.map((item, i) => (
+        {items.map((item,i) => (
           <li key={item.name} className="flex items-center gap-2">
             {item.path ? (
               <Link to={item.path} className="transition-colors hover:text-brand">
