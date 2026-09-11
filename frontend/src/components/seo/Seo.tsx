@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 
 const SITE = import.meta.env.VITE_SITE_URL ?? "https://modzero.app";
 
-function upsertMeta(selector: string, attr: "name" | "property", key: string, content: string) {
+function upsertMeta(selector: string,attr: "name" | "property", key: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(selector);
   if (!el) {
     el = document.createElement("meta");
