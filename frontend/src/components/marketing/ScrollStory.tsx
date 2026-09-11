@@ -5,12 +5,13 @@ import { demoImage } from "../../lib/demo";
 /**
  * The scroll-linked section.
  *
- * The panel pins to the viewport while three steps scroll past it. Everything —
+ * The panel pins to the view port while three steps scroll past it. Everything —
  * which step is lit, the artwork on the right, the progress rail — is derived
- * from scroll position, so it scrubs both ways instead of firing once.
+ * from scroll position, so that's why both ways instead of firing once.
  */
 
 const STEPS = [
+  
   {
     n: "01",
     title: "Registration",
