@@ -20,6 +20,8 @@ function upsertLink(rel: string, href: string) {
     el.rel = rel;
     document.head.appendChild(el);
   }
+
+  
   el.href = href;
 }
 
