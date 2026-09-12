@@ -5,6 +5,7 @@ import { useAccount, useConnect, useDisconnect, useEnsName } from "wagmi";
 import { mainnet } from "wagmi/chains";
 import Lenis from "lenis";
 import { Avatar, Button, truncateAddress } from "../ui";
+import { Wordmark } from "../brand/Logo";
 import { isOffline, onOfflineChange } from "../../lib/client";
 
 export function useIdentity() {
@@ -95,7 +96,7 @@ function Wallet() {
         href="https://metamask.io/download/"
         target="_blank"
         rel="noreferrer noopener"
-        className="inline-flex items-center gap-2 rounded-full border-2 border-line bg-card px-5 py-2.5 text-[17px] font-semibold text-navy transition-colors hover:border-brand hover:text-brand"
+        className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border-2 border-line bg-card px-5 py-2.5 text-[17px] font-semibold text-navy transition-colors hover:border-brand hover:text-brand"
         title="No browser wallet detected"
       >
         Install a wallet
@@ -140,7 +141,7 @@ function NavItem({ to, label, end }: { to: string; label: string; end?: boolean 
         to={to}
         end={end}
         className={({ isActive }) =>
-          `rounded-full px-4 py-2 text-[17px] font-medium transition-colors ${
+          `whitespace-nowrap rounded-full px-3.5 py-2 text-[17px] font-medium transition-colors ${
             isActive ? "bg-band text-navy" : "text-slate hover:text-navy"
           }`
         }
@@ -173,7 +174,8 @@ function NavItem({ to, label, end }: { to: string; label: string; end?: boolean 
 
 const NAV = [
   { to: "/", label: "Home", end: true },
-  { to: "/#feed", label: "Feed" },
+  { to: "/feed", label: "Feed" },
+  { to: "/m", label: "Communities" },
   { to: "/verify", label: "Verify" },
   { to: "/studio", label: "Studio" },
 ];
@@ -200,25 +202,21 @@ export default function Shell() {
       />
 
       <header className="sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1440px] items-center gap-8 px-8 py-5">
-          <Link to="/" className="flex items-center gap-3">
-            <span
-              className="h-8 w-8 rounded-xl"
-              style={{ background: "linear-gradient(135deg,#635bff,#00b8e0)" }}
-            />
-            <span className="text-[22px] font-bold tracking-tight text-navy">ModZero</span>
+        <div className="mx-auto flex max-w-[1440px] items-center gap-5 px-8 py-5">
+          <Link to="/" aria-label="ModZero home" className="shrink-0">
+            <Wordmark size={34} />
           </Link>
 
-          <nav className="ml-4 hidden items-center gap-2 md:flex">
+          <nav className="ml-2 hidden items-center gap-1 lg:flex">
             {NAV.map((item) => (
               <NavItem key={item.to} to={item.to} label={item.label} end={item.end} />
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex shrink-0 items-center gap-3">
             {offline && (
               <span
-                className="hidden items-center gap-2 text-[15px] text-muted lg:flex"
+                className="hidden items-center gap-2 whitespace-nowrap text-[15px] text-muted xl:flex"
                 title="The backend is not running, so sample data is being shown"
               >
                 <span className="h-2 w-2 rounded-full bg-sun" />
@@ -241,13 +239,7 @@ export default function Shell() {
         <div className="mx-auto max-w-[1440px] px-8 py-16">
           <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-4">
             <div className="lg:col-span-1">
-              <div className="flex items-center gap-3">
-                <span
-                  className="h-9 w-9 rounded-xl"
-                  style={{ background: "linear-gradient(135deg,#5b53ff,#00b0d8)" }}
-                />
-                <span className="text-[21px] font-bold tracking-tight text-navy">ModZero</span>
-              </div>
+              <Wordmark size={36} />
               <p className="mt-5 max-w-xs text-[17px] leading-relaxed text-slate">
                 Content provenance and licensing. Authorship is proven at upload rather than
                 argued about afterwards.
@@ -257,7 +249,8 @@ export default function Shell() {
             <nav aria-label="Product">
               <h2 className="text-[17px] font-bold text-navy">Product</h2>
               <ul className="mt-5 space-y-3 text-[17px] text-slate">
-                <li><Link to="/" className="transition-colors hover:text-brand">Feed</Link></li>
+                <li><Link to="/feed" className="transition-colors hover:text-brand">Feed</Link></li>
+                <li><Link to="/m" className="transition-colors hover:text-brand">Communities</Link></li>
                 <li><Link to="/compose" className="transition-colors hover:text-brand">Publish a work</Link></li>
                 <li><Link to="/verify" className="transition-colors hover:text-brand">Check an image</Link></li>
                 <li><Link to="/studio" className="transition-colors hover:text-brand">Your studio</Link></li>

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useIdentity } from "../components/layout/Shell";
 import { Avatar, Button, Card, ErrorNote, Pill, inputClass, truncateAddress } from "../components/ui";
 import { createClaim, createPost, getContent, imageFor, requestLicense, verifyContent } from "../lib/client";
 import type { ContentRecord, VerifyResult } from "../lib/api";
 import { useSeo } from "../components/seo/Seo";
+import { allCommunities, isValidSlug, withCommunity } from "../lib/communities";
 
 const EXPO = [0.16, 1, 0.3, 1] as const;
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -24,6 +25,11 @@ export default function Compose() {
   const navigate = useNavigate();
   const { address, ensName, isConnected } = useIdentity();
 
+  const [params] = useSearchParams();
+  const [community, setCommunity] = useState(() => {
+    const requested = (params.get("m") ?? "").toLowerCase();
+    return isValidSlug(requested) ? requested : "showcase";
+  });
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -79,7 +85,7 @@ export default function Compose() {
           intendsPoliticalUse: false,
         });
       }
-      const post = await createPost(text.trim(), address, file ?? undefined);
+      const post = await createPost(withCommunity(community, text), address, file ?? undefined);
       if (!withLicence && result?.probableRootContentId && post.contentId) {
         await createClaim({
           contentId: post.contentId,
@@ -108,6 +114,41 @@ export default function Compose() {
         <div className="flex gap-5">
           <Avatar seed={ensName ?? address ?? "guest"} size={52} />
           <div className="flex-1">
+            <div className="mb-5">
+              <label htmlFor="community" className="mb-2 block text-[17px] font-semibold text-navy">
+                Community
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {allCommunities().map((c) => (
+                  <button
+                    key={c.slug}
+                    type="button"
+                    onClick={() => setCommunity(c.slug)}
+                    className={`rounded-full px-4 py-2 text-[16px] font-semibold transition-all ${
+                      community === c.slug
+                        ? `${c.tone} ring-2 ring-brand ring-offset-2`
+                        : "bg-band text-slate hover:text-navy"
+                    }`}
+                  >
+                    m/{c.slug}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-[17px] font-semibold text-muted">m/</span>
+                <input
+                  id="community"
+                  value={community}
+                  onChange={(e) => setCommunity(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                  placeholder="or type a new one"
+                  className="w-56 rounded-xl border-2 border-line bg-card px-4 py-2 text-[17px] text-navy outline-none transition-colors focus:border-brand"
+                />
+                {community && !isValidSlug(community) && (
+                  <span className="text-[16px] text-flag">2–24 letters, numbers or dashes</span>
+                )}
+              </div>
+            </div>
+
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}

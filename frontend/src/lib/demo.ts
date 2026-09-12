@@ -99,7 +99,7 @@ export const demoPosts: PostRecord[] = [
   {
     postId: "0xpost04",
     creatorAddress: A.dev,
-    text: "shipped the watermark round-trip test today. survives a 70% jpeg re-encode and a 15% crop. the detector still finds it.",
+    text: "m/provenance\nshipped the watermark round-trip test today. survives a 70% jpeg re-encode and a 15% crop. the detector still finds it.",
     textHash: hash("t4"),
     contentId: null,
     createdAt: new Date(Date.now() - 3600e3 * 1).toISOString(),
@@ -110,7 +110,7 @@ export const demoPosts: PostRecord[] = [
   {
     postId: "0xpost03",
     creatorAddress: A.carol,
-    text: "morning light on the studio wall. no filter, no edits.",
+    text: "m/photography\nmorning light on the studio wall. no filter, no edits.",
     textHash: hash("t3"),
     contentId: "0xc0ffee03",
     createdAt: new Date(Date.now() - 3600e3 * 7).toISOString(),
@@ -121,7 +121,7 @@ export const demoPosts: PostRecord[] = [
   {
     postId: "0xpost02",
     creatorAddress: A.bob,
-    text: "licensed this from alice — commercial, 0.02 ETH, attribution kept. took about nine seconds.",
+    text: "m/showcase\nlicensed this from alice — commercial, 0.02 ETH, attribution kept. took about nine seconds.",
     textHash: hash("t2"),
     contentId: "0xc0ffee02",
     createdAt: new Date(Date.now() - 864e5 * 1.4).toISOString(),
@@ -132,7 +132,7 @@ export const demoPosts: PostRecord[] = [
   {
     postId: "0xpost01",
     creatorAddress: A.alice,
-    text: "first one. fingerprinted, watermarked, timestamped before it ever hit the feed.",
+    text: "m/showcase\nfirst one. fingerprinted, watermarked, timestamped before it ever hit the feed.",
     textHash: hash("t1"),
     contentId: "0xc0ffee01",
     createdAt: new Date(Date.now() - 864e5 * 3).toISOString(),

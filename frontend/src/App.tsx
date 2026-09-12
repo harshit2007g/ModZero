@@ -16,6 +16,9 @@ const Content = lazy(() => import("./pages/Content"));
 const LicenseRequest = lazy(() => import("./pages/LicenseRequest"));
 const Claim = lazy(() => import("./pages/Claim"));
 const Profile = lazy(() => import("./pages/Profile"));
+const AllFeed = lazy(() => import("./pages/AllFeed"));
+const Communities = lazy(() => import("./pages/Communities"));
+const Community = lazy(() => import("./pages/Community"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -39,6 +42,9 @@ export default function App() {
             <Routes>
               <Route element={<Shell />}>
                 <Route path="/" element={<Feed />} />
+                <Route path="/feed" element={<AllFeed />} />
+                <Route path="/m" element={<Communities />} />
+                <Route path="/m/:slug" element={<Community />} />
                 <Route path="/compose" element={<Compose />} />
                 <Route path="/post/:id" element={<PostDetail />} />
                 <Route path="/verify" element={<Verify />} />
@@ -48,7 +54,6 @@ export default function App() {
                 <Route path="/u/:address" element={<Profile />} />
                 <Route path="/studio" element={<Profile />} />
                 {/* older paths, kept so existing links resolve */}
-                <Route path="/feed" element={<Navigate to="/" replace />} />
                 <Route path="/post/new" element={<Navigate to="/compose" replace />} />
                 <Route path="/upload" element={<Navigate to="/compose" replace />} />
                 <Route path="/dashboard" element={<Navigate to="/studio" replace />} />

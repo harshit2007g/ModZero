@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Record pages are generated per-ID and have no standalone value in search.
+Disallow: /content/
+Disallow: /claim/
+Disallow: /license/
+
+Sitemap: https://modzero.app/sitemap.xml
