@@ -8,6 +8,8 @@ import { Avatar, Button, truncateAddress } from "../ui";
 import { Wordmark } from "../brand/Logo";
 import { isOffline, onOfflineChange } from "../../lib/client";
 
+const ETHERSCAN_BASE = import.meta.env.VITE_ETHERSCAN_BASE ?? "https://sepolia.etherscan.io"; const REGISTRIES: { name: string; address?: string }[] = [ { name: "ContentRegistry", address: import.meta.env.VITE_CONTENT_REGISTRY_ADDRESS }, { name: "PostRegistry", address: import.meta.env.VITE_POST_REGISTRY_ADDRESS }, { name: "LicenseRegistry", address: import.meta.env.VITE_LICENSE_REGISTRY_ADDRESS }, { name: "ChallengeRegistry", address: import.meta.env.VITE_CHALLENGE_REGISTRY_ADDRESS }, ];
+
 export function useIdentity() {
   const { address, isConnected } = useAccount();
   const { data: ensName } = useEnsName({ address, chainId: mainnet.id });
