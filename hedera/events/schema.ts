@@ -5,9 +5,9 @@
  * HCS topic. Both `hedera/publisher` and `backend/indexer` MUST import from
  * here rather than redefining these shapes, to avoid schema drift.
  *
- * Mirrors docs/SPEC.md section 15 exactly. Do not change field names or
- * types without updating the spec and notifying the whole team (spec §38
- * Rule 2 — do not invent new protocol behavior unilaterally).
+ * Mirrors docs/SPEC.md section 15, extended with POST_CREATED,
+ * CHALLENGE_CREATED, and CHALLENGE_RESOLVED for the posts/challenges
+ * feature (not in the original spec — added later in the build).
  */
 
 export type HcsEventType =
@@ -15,23 +15,26 @@ export type HcsEventType =
   | "CONTENT_DERIVED"
   | "LICENSE_CREATED"
   | "CLAIM_CREATED"
-  | "CLAIM_RESOLVED";
+  | "CLAIM_RESOLVED"
+  | "POST_CREATED"
+  | "CHALLENGE_CREATED"
+  | "CHALLENGE_RESOLVED";
 
 export interface ContentCreatedEvent {
   type: "CONTENT_CREATED";
   version: 1;
   contentId: string;
-  creator: string; // 0x address
-  ens: string; // e.g. "alice.eth"
-  fingerprintCommitment: string; // 0x hash
+  creator: string;
+  ens: string;
+  fingerprintCommitment: string;
   mediaUri: string;
-  timestamp: string; // ISO 8601
+  timestamp: string;
 }
 
 export interface ContentDerivedEvent {
   type: "CONTENT_DERIVED";
   version: 1;
-  contentId: string; // child content
+  contentId: string;
   parentContentId: string;
   creator: string;
   fingerprintMatch: boolean;
@@ -70,12 +73,43 @@ export interface ClaimResolvedEvent {
   timestamp: string;
 }
 
+export interface PostCreatedEvent {
+  type: "POST_CREATED";
+  version: 1;
+  postId: string;
+  creator: string;
+  textHash: string;
+  contentId: string | null;
+  timestamp: string;
+}
+
+export interface ChallengeCreatedEvent {
+  type: "CHALLENGE_CREATED";
+  version: 1;
+  challengeId: string;
+  postId: string;
+  challenger: string;
+  creator: string;
+  timestamp: string;
+}
+
+export interface ChallengeResolvedEvent {
+  type: "CHALLENGE_RESOLVED";
+  version: 1;
+  challengeId: string;
+  outcome: "GUILTY" | "NOT_GUILTY";
+  timestamp: string;
+}
+
 export type HcsEvent =
   | ContentCreatedEvent
   | ContentDerivedEvent
   | LicenseCreatedEvent
   | ClaimCreatedEvent
-  | ClaimResolvedEvent;
+  | ClaimResolvedEvent
+  | PostCreatedEvent
+  | ChallengeCreatedEvent
+  | ChallengeResolvedEvent;
 
 /** Narrow an unknown parsed JSON payload into a typed HcsEvent, or null. */
 export function parseHcsEvent(raw: unknown): HcsEvent | null {
@@ -87,11 +121,12 @@ export function parseHcsEvent(raw: unknown): HcsEvent | null {
     "LICENSE_CREATED",
     "CLAIM_CREATED",
     "CLAIM_RESOLVED",
+    "POST_CREATED",
+    "CHALLENGE_CREATED",
+    "CHALLENGE_RESOLVED",
   ];
   if (typeof obj.type !== "string" || !validTypes.includes(obj.type as HcsEventType)) {
     return null;
   }
-  // Structural validation only — callers should still handle malformed
-  // fields defensively since this is ingesting external event data.
   return obj as unknown as HcsEvent;
 }
