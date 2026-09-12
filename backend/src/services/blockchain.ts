@@ -280,3 +280,36 @@ export async function verifyPaymentOnChain(
 
   return { valid: true };
 }
+const USERNAME_REGISTRY_ABI = [
+  "function register(string calldata username) external",
+  "function resolve(string calldata username) external view returns (address)",
+  "function reverseResolve(address owner) external view returns (string memory)",
+];
+
+export const usernameRegistry = new ethers.Contract(
+  process.env.USERNAME_REGISTRY_ADDRESS as string,
+  USERNAME_REGISTRY_ABI,
+  wallet
+);
+
+/**
+ * Registers a username on-chain for the given address. Note: this uses
+ * the BACKEND's wallet to sign the transaction (same known simplification
+ * as license/claim/challenge elsewhere) — a production version would have
+ * the user's own connected wallet sign this directly.
+ */
+export async function registerUsernameOnChain(username: string): Promise<string> {
+  const tx = await usernameRegistry.register(username);
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+export async function resolveUsernameOnChain(username: string): Promise<string | null> {
+  const address = await usernameRegistry.resolve(username);
+  return address === ethers.ZeroAddress ? null : address;
+}
+
+export async function reverseResolveUsernameOnChain(address: string): Promise<string | null> {
+  const username = await usernameRegistry.reverseResolve(address);
+  return username === "" ? null : username;
+}

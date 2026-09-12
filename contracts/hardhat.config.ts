@@ -18,6 +18,7 @@ const config: HardhatUserConfig = {
     sepolia: {
       url: RPC_URL,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      timeout: 120000,
     },
     hardhat: {},
   },
