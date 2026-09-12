@@ -272,11 +272,24 @@ export default function Shell() {
             <div>
               <h2 className="text-[17px] font-bold text-navy">Registries</h2>
               <ul className="mt-5 space-y-3 text-[17px] text-slate">
-                <li>ContentRegistry</li>
-                <li>PostRegistry</li>
-                <li>LicenseRegistry</li>
-                <li>ChallengeRegistry</li>
-              </ul>
+  {REGISTRIES.map(({ name, address }) => (
+    <li key={name}>
+      {address ? (
+        
+          href={`${ETHERSCAN_BASE}/address/${address}#code`}
+          target="_blank"
+          rel="noreferrer noopener"
+          title={address}
+          className="font-mono transition-colors hover:text-brand"
+        >
+          {name}
+        </a>
+      ) : (
+        name
+      )}
+    </li>
+  ))}
+</ul>
             </div>
           </div>
 
