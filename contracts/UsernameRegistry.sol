@@ -13,19 +13,21 @@ contract UsernameRegistry {
 
     event UsernameRegistered(string username, address indexed owner);
 
-    /// @notice Registers `username` to the caller's address. Reverts if
-    ///         the name is taken, or if the caller already owns a
-    ///         different username (one name per address, MVP simplicity).
-    function register(string calldata username) external {
+    /// @notice Registers `username` to `owner`. Callable by anyone acting
+    ///         on the owner's behalf (matches the same backend-relay
+    ///         pattern used elsewhere in ModZero — see blockchain.ts).
+    ///         No signature check for MVP simplicity; a production
+    ///         version would require the owner's own signed transaction.
+    function register(string calldata username, address owner) external {
         require(bytes(username).length >= 3 && bytes(username).length <= 32, "username must be 3-32 characters");
         require(_isValidFormat(username), "username may only contain a-z, 0-9, and hyphens");
         require(usernameToOwner[username] == address(0), "username already registered");
-        require(bytes(ownerToUsername[msg.sender]).length == 0, "address already owns a username");
+        require(bytes(ownerToUsername[owner]).length == 0, "address already owns a username");
 
-        usernameToOwner[username] = msg.sender;
-        ownerToUsername[msg.sender] = username;
+        usernameToOwner[username] = owner;
+        ownerToUsername[owner] = username;
 
-        emit UsernameRegistered(username, msg.sender);
+        emit UsernameRegistered(username, owner);
     }
 
     /// @notice Forward resolution: username -> address. Returns

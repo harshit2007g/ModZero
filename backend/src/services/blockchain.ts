@@ -281,11 +281,10 @@ export async function verifyPaymentOnChain(
   return { valid: true };
 }
 const USERNAME_REGISTRY_ABI = [
-  "function register(string calldata username) external",
+  "function register(string calldata username, address owner) external",
   "function resolve(string calldata username) external view returns (address)",
   "function reverseResolve(address owner) external view returns (string memory)",
 ];
-
 export const usernameRegistry = new ethers.Contract(
   process.env.USERNAME_REGISTRY_ADDRESS as string,
   USERNAME_REGISTRY_ABI,
@@ -298,8 +297,8 @@ export const usernameRegistry = new ethers.Contract(
  * as license/claim/challenge elsewhere) — a production version would have
  * the user's own connected wallet sign this directly.
  */
-export async function registerUsernameOnChain(username: string): Promise<string> {
-  const tx = await usernameRegistry.register(username);
+export async function registerUsernameOnChain(username: string, owner: string): Promise<string> {
+  const tx = await usernameRegistry.register(username, owner);
   const receipt = await tx.wait();
   return receipt.hash;
 }
