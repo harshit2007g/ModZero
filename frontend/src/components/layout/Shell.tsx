@@ -268,16 +268,51 @@ export default function Shell() {
               </ul>
             </nav>
 
-            <div>
-              <h2 className="text-[17px] font-bold text-navy">Registries</h2>
-              <ul className="mt-5 space-y-3 text-[17px] text-slate">
-                <li>ContentRegistry</li>
-                <li>PostRegistry</li>
-                <li>LicenseRegistry</li>
-                <li>ChallengeRegistry</li>
-              </ul>
-            </div>
-          </div>
+          <div>
+  <h2 className="text-[17px] font-bold text-navy">Registries</h2>
+  <ul className="mt-5 space-y-3 text-[17px] text-slate">
+    <li>
+      <a 
+        href="https://sepolia.etherscan.io/address/0x4399C9dd2e8faa49007dbe9b23eAa7d668854d41#code" 
+        target="_blank" 
+        rel="noreferrer" 
+        className="transition-colors hover:text-brand"
+      >
+        ContentRegistry
+      </a>
+    </li>
+    <li>
+      <a 
+        href="https://sepolia.etherscan.io/address/0x419F080f72eb004d7622FFb6293D6b88cE715C3C#code" 
+        target="_blank" 
+        rel="noreferrer" 
+        className="transition-colors hover:text-brand"
+      >
+        PostRegistry
+      </a>
+    </li>
+    <li>
+      <a 
+        href="https://sepolia.etherscan.io/address/0xa9cA08071Bab2a06150C5d14c4d572e18C3B96Ec#code" 
+        target="_blank" 
+        rel="noreferrer" 
+        className="transition-colors hover:text-brand"
+      >
+        LicenseRegistry
+      </a>
+    </li>
+    <li>
+      <a 
+        href="https://sepolia.etherscan.io/address/0x543a26D8F2d61c08C26Ed15417FeBc106de0Ea5B#code" 
+        target="_blank" 
+        rel="noreferrer" 
+        className="transition-colors hover:text-brand"
+      >
+        ChallengeRegistry
+      </a>
+    </li>
+  </ul>
+</div>
 
           <div className="mt-14 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-8">
             <p className="text-[17px] text-muted">No moderator. Just proof.</p>
