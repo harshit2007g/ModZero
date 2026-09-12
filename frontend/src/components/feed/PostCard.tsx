@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import type { ContentRecord, PostRecord } from "../../lib/api";
 import { getContent, imageFor } from "../../lib/client";
+import { bodyOf, communityOf } from "../../lib/communities";
 import { Avatar, Card, Pill, timeAgo, truncateAddress } from "../ui";
+import { CommunityChip } from "./CommunityChip";
 
 const EXPO = [0.16, 1, 0.3, 1] as const;
 
@@ -23,6 +25,8 @@ export default function PostCard({ post, index = 0 }: { post: PostRecord; index?
 
   const image = post.contentId ? imageFor(content, post.contentId) : null;
   const derivative = Boolean(content?.parentContentId);
+  const community = communityOf(post);
+  const body = bodyOf(post);
 
   return (
     <motion.div
@@ -37,12 +41,15 @@ export default function PostCard({ post, index = 0 }: { post: PostRecord; index?
             <Avatar seed={post.creatorAddress} size={58} />
           </Link>
           <div className="min-w-0 flex-1">
-            <Link
-              to={`/u/${post.creatorAddress}`}
-              className="block font-mono text-[19px] font-semibold text-navy transition-colors hover:text-brand"
-            >
-              {truncateAddress(post.creatorAddress)}
-            </Link>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Link
+                to={`/u/${post.creatorAddress}`}
+                className="font-mono text-[19px] font-semibold text-navy transition-colors hover:text-brand"
+              >
+                {truncateAddress(post.creatorAddress)}
+              </Link>
+              <CommunityChip slug={community} size="sm" />
+            </div>
             <p className="text-[17px] text-muted">{timeAgo(post.createdAt)}</p>
           </div>
           {typeof post.creatorReputation === "number" && post.creatorReputation !== 0 && (
@@ -54,7 +61,7 @@ export default function PostCard({ post, index = 0 }: { post: PostRecord; index?
         </div>
 
         <Link to={`/post/${post.postId}`} className="block px-8 pb-7 pt-5">
-          <p className="text-[22px] leading-[1.5] text-navy">{post.text}</p>
+          <p className="whitespace-pre-line text-[22px] leading-[1.5] text-navy">{body}</p>
         </Link>
 
         {image && (

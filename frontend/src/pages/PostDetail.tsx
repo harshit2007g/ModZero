@@ -87,7 +87,7 @@ export default function PostDetail() {
   return (
     <div className="mx-auto max-w-[760px] px-8 py-14">
       <Breadcrumbs
-        items={[{ name: "Feed", path: "/" }, { name: truncateAddress(post.creatorAddress), path: `/u/${post.creatorAddress}` }, { name: "Post" }]}
+        items={[{ name: "Feed", path: "/feed" }, { name: truncateAddress(post.creatorAddress), path: `/u/${post.creatorAddress}` }, { name: "Post" }]}
       />
       <Card className="overflow-hidden">
         <div className="flex items-center gap-5 p-7">

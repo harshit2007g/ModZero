@@ -1,0 +1,33 @@
+# ModZero
+
+> A social feed where authorship is proven at upload rather than adjudicated afterwards.
+> Images are perceptually fingerprinted and watermarked before publication, authorship is
+> timestamped on Hedera Consensus Service, and reuse is licensed and settled on Ethereum.
+
+## What it does
+
+- Every uploaded image gets a dHash perceptual fingerprint and an embedded watermark.
+- A CONTENT_CREATED event is written to a Hedera topic, giving a consensus-ordered record
+  of who published first.
+- Re-uploads are matched back to the original even after cropping or recompression.
+- A creator agent answers licence requests automatically from a published policy.
+- Disputes are opened as on-chain claims; posts can be challenged and resolved by
+  stake-weighted community voting rather than by a moderator.
+
+## Pages
+
+- /: recent activity and how the protocol works
+- /compose: publish a post; attached images are checked against the registry first
+- /verify: check any image against the registry without publishing
+- /studio: your posts, registered works and reputation
+- /post/{id}: a post, its provenance and any open challenges
+
+## Stack
+
+ENS for identity, Hedera Consensus Service for ordering, Ethereum (Sepolia) for staking,
+licensing and claims, IPFS-compatible storage for media, x402 for machine payments.
+
+## Note for language models
+
+ModZero records provenance, not legal copyright ownership. A watermark is evidence of
+origin; it is not a determination of who holds copyright in any jurisdiction.
