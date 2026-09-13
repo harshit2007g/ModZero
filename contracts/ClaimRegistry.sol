@@ -77,6 +77,15 @@ contract ClaimRegistry is ReentrancyGuard {
     ///         this reverts rather than silently resolving with no
     ///         settlement (spec §38 Rule 3: don't silently change
     ///         economic outcomes).
+    ///
+    ///         VALID settlement is restricted to the on-chain OWNER of the
+    ///         disputed content (`c.contentId`). Anyone can still *file* a
+    ///         claim, and any well-formed claim can be marked INVALID, but
+    ///         slashing can only ever be triggered by the party whose stake
+    ///         is at risk. This closes the "file a claim against someone
+    ///         else's content and resolve it VALID to drain their stake"
+    ///         attack (spec §26: deterministic, limited resolution — never
+    ///         a permissionless reward for naming an arbitrary contentId).
     function resolveClaim(bytes32 claimId, ClaimState outcome) external nonReentrant {
         require(
             outcome == ClaimState.RESOLVED_VALID || outcome == ClaimState.RESOLVED_INVALID,
@@ -89,6 +98,8 @@ contract ClaimRegistry is ReentrancyGuard {
 
         uint256 slashedAmount = 0;
         if (outcome == ClaimState.RESOLVED_VALID) {
+            (address contentOwner, , , , , ) = contentRegistry.getContent(c.contentId);
+            require(contentOwner == msg.sender, "only the content owner can settle a VALID claim");
             slashedAmount = contentRegistry.slashStake(c.contentId, payable(c.claimant));
         }
 

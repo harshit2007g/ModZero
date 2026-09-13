@@ -1,38 +1,20 @@
 import { Router } from "express";
 import { ethers } from "ethers";
 import {
-    registerUsernameOnChain,
     resolveUsernameOnChain,
     reverseResolveUsernameOnChain,
 } from "../services/blockchain.js";
 
 const router = Router();
 
-const USERNAME_PATTERN = /^[a-z0-9-]{3,32}$/;
-
-router.post("/username", async (req, res) => {
-    try {
-        const { username, address } = req.body ?? {};
-        if (!username || typeof username !== "string") {
-            return res.status(400).json({ error: "username is required" });
-        }
-        if (!address || !ethers.isAddress(address)) {
-            return res.status(400).json({ error: "a valid address is required" });
-        }
-        if (!USERNAME_PATTERN.test(username)) {
-            return res
-                .status(400)
-                .json({ error: "username must be 3-32 characters, lowercase a-z, 0-9, and hyphens only" });
-        }
-
-        const ethereumTxHash = await registerUsernameOnChain(username, address);
-        res.status(201).json({ username, address, ethereumTxHash });
-    } catch (err) {
-        console.error("[POST /username] failed:", err);
-        const message = err instanceof Error ? err.message : "failed to register username";
-        res.status(400).json({ error: message });
-    }
-});
+/**
+ * NOTE: There is intentionally NO POST /username here. UsernameRegistry
+ * only implements 1-arg `register(string)` (owner = msg.sender) — matching
+ * both the deployed registry and the contract source. Registration is signed
+ * directly by the user's own wallet in the frontend (see
+ * frontend/src/lib/usernameRegistry.ts), so the backend is read-only for
+ * usernames: forward + reverse resolution only.
+ */
 
 /**
  * GET /username/resolve?name=harshit

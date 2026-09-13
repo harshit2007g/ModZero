@@ -46,4 +46,10 @@ db.exec(`
     termsJson TEXT,
     ethereumTxHash TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS used_payment (
+    paymentTxHash TEXT PRIMARY KEY,
+    licenseId TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+  );
 `);

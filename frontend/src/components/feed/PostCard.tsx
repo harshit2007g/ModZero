@@ -6,11 +6,13 @@ import { getContent, imageFor } from "../../lib/client";
 import { bodyOf, communityOf } from "../../lib/communities";
 import { Avatar, Card, Pill, timeAgo, truncateAddress } from "../ui";
 import { CommunityChip } from "./CommunityChip";
+import { useDisplayName } from "../../lib/identity";
 
 const EXPO = [0.16, 1, 0.3, 1] as const;
 
 export default function PostCard({ post, index = 0 }: { post: PostRecord; index?: number }) {
   const [content, setContent] = useState<ContentRecord | null>(null);
+  const displayName = useDisplayName(post.creatorAddress) ?? truncateAddress(post.creatorAddress);
 
   useEffect(() => {
     let alive = true;
@@ -46,7 +48,7 @@ export default function PostCard({ post, index = 0 }: { post: PostRecord; index?
                 to={`/u/${post.creatorAddress}`}
                 className="font-mono text-[19px] font-semibold text-navy transition-colors hover:text-brand"
               >
-                {truncateAddress(post.creatorAddress)}
+                {displayName}
               </Link>
               <CommunityChip slug={community} size="sm" />
             </div>
@@ -68,7 +70,7 @@ export default function PostCard({ post, index = 0 }: { post: PostRecord; index?
           <Link to={`/post/${post.postId}`} className="block overflow-hidden">
             <img
               src={image}
-              alt={`Registered work attached to a post by ${truncateAddress(post.creatorAddress)}`}
+              alt={`Registered work attached to a post by ${displayName}`}
               className="aspect-[16/10] w-full object-cover"
               loading="lazy"
             />

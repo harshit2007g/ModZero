@@ -177,7 +177,7 @@ export const requestLicense = (input: Parameters<typeof api.requestLicense>[0]) 
         ethereumTxHash: `0x${Math.random().toString(16).slice(2, 18)}`,
       };
       demoLicenses[id] = record;
-      return record;
+      return { status: "issued" as const, license: record };
     },
   );
 
@@ -276,9 +276,14 @@ export const getChallenge = (id: string) =>
   );
 
 /** Challenges known to this session, keyed by post — the API has no list route. */
-export function challengesForPost(postId: string): ChallengeRecord[] {
-  return Object.values(demoChallenges).filter((c) => c.postId === postId);
-}
+export const listChallenges = (postId?: string) =>
+  fallback(
+    () => api.listChallenges(postId),
+    () => {
+      const all = Object.values(demoChallenges);
+      return postId ? all.filter((c) => c.postId === postId) : all;
+    },
+  );
 
 /** Resolves a mediaUri to something an <img> can load, demo images included. */
 export function imageFor(record: ContentRecord | undefined | null, seed?: string): string | null {

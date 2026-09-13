@@ -179,7 +179,7 @@ export function saveCommunity(input: {
 
   const community: Community = {
     slug,
-    title: input.title.trim() || slug.replace(/-/g, " ").replace(/\w/g, (ch) => ch.toUpperCase()),
+    title: input.title.trim() || slug.replace(/-/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase()),
     blurb: input.blurb.trim() || "A community created by its first post.",
     tone: toneFor(slug),
   };

@@ -8,7 +8,14 @@ const accountId = process.env.HEDERA_ACCOUNT_ID as string;
 const privateKey = process.env.HEDERA_PRIVATE_KEY as string;
 const topicId = process.env.HEDERA_TOPIC_ID as string;
 
-const client = Client.forTestnet();
+// Honor HEDERA_NETWORK (mainnet | testnet | previewnet), defaulting to
+// testnet so a missing/legacy env still behaves like before.
+const client =
+  process.env.HEDERA_NETWORK === "mainnet"
+    ? Client.forMainnet()
+    : process.env.HEDERA_NETWORK === "previewnet"
+      ? Client.forPreviewnet()
+      : Client.forTestnet();
 client.setOperator(accountId, PrivateKey.fromStringECDSA(privateKey));
 
 /**

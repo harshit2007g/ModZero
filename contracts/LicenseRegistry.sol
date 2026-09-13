@@ -34,6 +34,12 @@ contract LicenseRegistry {
 
     /// @notice Called by the licensor (or an authorized agent relay) once
     ///         x402 payment has been independently verified off-chain.
+    /// @dev The issuer must be the licensor itself. This keeps the license
+    ///      registry from being a permissionless "self-certify" store: only
+    ///      the party that received the payment can record the license it
+    ///      grants. The off-chain relay signs as the licensor, so the
+    ///      backend-verified flow is unaffected; forging a license on behalf
+    ///      of a real licensor is not possible.
     function issueLicense(
         bytes32 licenseId,
         bytes32 contentId,
@@ -42,10 +48,10 @@ contract LicenseRegistry {
         bytes32 termsHash,
         uint64 expiresAt
     ) external {
+        require(msg.sender == licensor, "only the licensor can issue");
+
+        // licenseId must be unique across all content/licensee pairs.
         require(!licenses[licenseId].exists, "license already exists");
-        // NOTE: access control TBD — likely restricted to the registered
-        // content's creator (via ContentRegistry) or a trusted agent relay.
-        // Left open here intentionally; do not assume final auth model.
 
         licenses[licenseId] = License({
             contentId: contentId,

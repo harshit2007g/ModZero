@@ -1,28 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { sepolia } from "wagmi/chains";
+import { waitForTransactionReceipt } from "viem/actions";
 import PostCard from "../components/feed/PostCard";
 import { useIdentity } from "../components/layout/Shell";
 import { Avatar, Button, Card, Loading, truncateAddress } from "../components/ui";
 import { listPosts } from "../lib/client";
 import type { PostRecord } from "../lib/api";
 import { useSeo } from "../components/seo/Seo";
+import { useDisplayName, useModZeroName } from "../lib/identity";
+import { USERNAME_REGISTRY_ABI, USERNAME_REGISTRY_ADDRESS } from "../lib/usernameRegistry";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:4000";
-
-async function lookupUsername(address: string): Promise<string | null> {
-  const res = await fetch(`${API_BASE}/username/lookup?address=${address}`);
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.username ?? null;
-}
-
-async function registerUsername(username: string, address: string): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch(`${API_BASE}/username`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, address }),
-  }); return { ok: true };
-}
+const USERNAME_PATTERN = /^[a-z0-9-]{3,32}$/;
 
 export default function Profile() {
   useSeo({
@@ -31,16 +22,26 @@ export default function Profile() {
   });
 
   const { address: routeAddress } = useParams<{ address: string }>();
-  const { address: mine, ensName } = useIdentity();
+  const { address: mine } = useIdentity();
   const who = routeAddress ?? mine ?? "";
   const isMe = !!mine && who.toLowerCase() === mine.toLowerCase();
 
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [username, setUsername] = useState<string | null>(null);
+  const [localUsername, setLocalUsername] = useState<string | null>(null);
   const [usernameInput, setUsernameInput] = useState("");
-  const [registering, setRegistering] = useState(false);
   const [registerError, setRegisterError] = useState("");
+  const [pending, setPending] = useState<string | null>(null);
+
+  const walletClient = useWalletClient().data;
+  const publicClient = usePublicClient();
+  const { address: connectedAddress } = useAccount();
+  const registering = !!pending;
+
+  const resolvedUsername = useModZeroName(who);
+  const username = resolvedUsername ?? localUsername;
+  const resolvedDisplay = useDisplayName(who);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     listPosts()
@@ -48,23 +49,74 @@ export default function Profile() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (!who) return;
-    lookupUsername(who).then(setUsername);
-  }, [who]);
-
   async function handleRegister() {
-    if (!usernameInput) return;
-    setRegistering(true);
-    setRegisterError("");
-    const result = await registerUsername(usernameInput.toLowerCase(), who);
-    if (result.ok) {
-      setUsername(usernameInput.toLowerCase());
-      setUsernameInput("");
-    } else {
-      setRegisterError(result.error ?? "Registration failed");
+    const name = usernameInput.trim().toLowerCase();
+    if (!USERNAME_PATTERN.test(name)) {
+      setRegisterError("Usernames must be 3-32 characters: lowercase letters, numbers, and hyphens only.");
+      return;
     }
-    setRegistering(false);
+    if (!USERNAME_REGISTRY_ADDRESS) {
+      setRegisterError("UsernameRegistry address is not configured (VITE_USERNAME_REGISTRY_ADDRESS).");
+      return;
+    }
+    if (!walletClient || !publicClient || !connectedAddress) {
+      setRegisterError("Your wallet is not connected.");
+      return;
+    }
+    setRegisterError("");
+    setPending(name);
+    setUsernameInput("");
+    try {
+      // The deployed UsernameRegistry only implements register(string):
+      // owner becomes msg.sender — this wallet — so the registration is
+      // signed and paid for by the user directly (see lib/usernameRegistry).
+      //
+      // Gas: Sepolia's Fusaka hardfork enforces a 16,777,216 per-tx gas cap
+      // (EIP-7825). Some wallet/node estimators fall back to the chain gas
+      // limit (21,000,000 on this RPC's view) when no explicit gas is
+      // attached, which the node then rejects with "transaction gas limit
+      // too high". Estimate on-chain and pin a small-buffer value instead;
+      // it stays far under the cap and a real revert (e.g. name already
+      // taken) surfaces here instead of as a gas-cap error in the wallet.
+      const gasEstimate = await publicClient.estimateContractGas({
+        address: USERNAME_REGISTRY_ADDRESS,
+        abi: USERNAME_REGISTRY_ABI,
+        functionName: "register",
+        args: [name],
+        account: connectedAddress,
+      });
+      const gas = (gasEstimate * 3n) / 2n; // +50% safety buffer
+      const hash = await walletClient.writeContract({
+        address: USERNAME_REGISTRY_ADDRESS,
+        abi: USERNAME_REGISTRY_ABI,
+        functionName: "register",
+        args: [name],
+        chain: sepolia,
+        account: connectedAddress,
+        gas,
+      });
+      const receipt = await waitForTransactionReceipt(publicClient, {
+        hash,
+        confirmations: 1,
+      });
+      if (receipt.status !== "success") {
+        setRegisterError("Registration was reverted on-chain.");
+        return;
+      }
+      setLocalUsername(name);
+      const key = who.toLowerCase();
+      queryClient.invalidateQueries({ queryKey: ["username", key] });
+      queryClient.invalidateQueries({ queryKey: ["displayName", key] });
+    } catch (err) {
+      const e = err as { name?: string; shortMessage?: string; message?: string };
+      setRegisterError(
+        e.name === "UserRejectedRequestError"
+          ? "Registration was rejected in your wallet."
+          : (e.shortMessage ?? e.message ?? "Registration failed")
+      );
+    } finally {
+      setPending(null);
+    }
   }
 
   const owned = posts.filter((p) => p.creatorAddress.toLowerCase() === who.toLowerCase());
@@ -81,7 +133,7 @@ export default function Profile() {
   }
 
   // Display priority: on-chain username > ENS name > truncated address
-  const displayName = username ? `${username}.modzero` : isMe && ensName ? ensName : truncateAddress(who, 8);
+  const displayName = resolvedDisplay ?? truncateAddress(who, 8);
 
   return (
     <div className="mx-auto max-w-[900px] px-8 py-14">
@@ -105,7 +157,7 @@ export default function Profile() {
           <h2 className="text-[18px] font-bold tracking-tight text-navy">Claim your ModZero username</h2>
           <p className="mt-2 text-[16px] text-slate">
             Register a name on-chain so people see <span className="font-mono">yourname.modzero</span> instead
-            of your wallet address. This is a real transaction — takes a few seconds to confirm.
+            of your wallet address. Your wallet signs and pays for this — takes a few seconds to confirm.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <input
@@ -119,7 +171,9 @@ export default function Profile() {
               {registering ? "Registering…" : "Register"}
             </Button>
           </div>
-          {registerError && <p className="mt-2 text-sm text-red-600">{registerError}</p>}
+          {registerError && (
+            <p className="mt-2 text-sm text-red-600">{registerError}</p>
+          )}
           <p className="mt-2 text-xs text-muted">3-32 characters, lowercase letters, numbers, and hyphens only.</p>
         </Card>
       )}

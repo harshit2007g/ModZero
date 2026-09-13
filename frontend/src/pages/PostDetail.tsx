@@ -1,23 +1,29 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { sepolia } from "wagmi/chains";
+import { waitForTransactionReceipt } from "viem/actions";
 import { useIdentity } from "../components/layout/Shell";
 import { Avatar, Button, Card, ErrorNote, Loading, Pill, Row, timeAgo, truncateAddress } from "../components/ui";
 import {
-  challengesForPost,
+  listChallenges,
   createChallenge,
   getContent,
   getPost,
+  getChallenge,
   imageFor,
   resolveChallenge,
-  voteOnChallenge,
 } from "../lib/client";
 import type { ChallengeRecord, ContentRecord, PostRecord } from "../lib/api";
 import { useSeo } from "../components/seo/Seo";
 import Breadcrumbs from "../components/layout/Breadcrumbs";
+import { useDisplayName } from "../lib/identity";
+import { CHALLENGE_REGISTRY_ABI, CHALLENGE_REGISTRY_ADDRESS } from "../lib/challengeRegistry";
 
 function Countdown({ deadline }: { deadline: number }) {
-  const [now, setNow] = useState(Math.floor(Date.now() / 1000));
+  const [now, setNow] = useState(0);
   useEffect(() => {
+    setNow(Math.floor(Date.now() / 1000));
     const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(t);
   }, []);
@@ -39,6 +45,9 @@ export default function PostDetail() {
 
   const { id } = useParams<{ id: string }>();
   const { isConnected } = useIdentity();
+  const { address: connectedAddress } = useAccount();
+  const walletClient = useWalletClient().data;
+  const publicClient = usePublicClient();
 
   const [post, setPost] = useState<PostRecord | null>(null);
   const [content, setContent] = useState<ContentRecord | null>(null);
@@ -46,12 +55,16 @@ export default function PostDetail() {
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
+  // Resolve the creator identity once; falls back to truncated address while
+  // loading or if the lookup fails, so it can never block the page.
+  const creatorName = useDisplayName(post?.creatorAddress ?? "") ?? truncateAddress(post?.creatorAddress ?? "");
+
   useEffect(() => {
     if (!id) return;
     getPost(id)
       .then(async (p) => {
         setPost(p);
-        setChallenges(challengesForPost(p.postId));
+        setChallenges(await listChallenges(p.postId));
         if (p.contentId) {
           try {
             setContent(await getContent(p.contentId));
@@ -79,6 +92,51 @@ export default function PostDetail() {
     }
   }
 
+  /**
+   * Wallet-native vote: the voter signs and pays for their own ballot, so
+   * every vote is a distinct on-chain address and quorum is reachable
+   * (a backend-relayed vote would always come from the same address).
+   */
+  async function vote(challengeId: string, guilty: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      if (!walletClient || !publicClient || !connectedAddress) {
+        throw new Error("Connect a wallet to vote.");
+      }
+      if (!CHALLENGE_REGISTRY_ADDRESS) {
+        throw new Error("ChallengeRegistry address is not configured (VITE_CHALLENGE_REGISTRY_ADDRESS).");
+      }
+      const gasEstimate = await publicClient.estimateContractGas({
+        address: CHALLENGE_REGISTRY_ADDRESS,
+        abi: CHALLENGE_REGISTRY_ABI,
+        functionName: "vote",
+        args: [challengeId as `0x${string}`, guilty],
+        account: connectedAddress,
+      });
+      const gas = (gasEstimate * 3n) / 2n; // +50% safety buffer, same as username registration
+      const hash = await walletClient.writeContract({
+        address: CHALLENGE_REGISTRY_ADDRESS,
+        abi: CHALLENGE_REGISTRY_ABI,
+        functionName: "vote",
+        args: [challengeId as `0x${string}`, guilty],
+        chain: sepolia,
+        account: connectedAddress,
+        gas,
+      });
+      const receipt = await waitForTransactionReceipt(publicClient, { hash, confirmations: 1 });
+      if (receipt.status !== "success") {
+        throw new Error("Your vote was reverted on-chain.");
+      }
+      const fresh = await getChallenge(challengeId);
+      setChallenges((prev) => prev.map((x) => (x.challengeId === challengeId ? fresh : x)));
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (error) return <div className="mx-auto max-w-[760px] px-8 py-20"><ErrorNote error={error} /></div>;
   if (!post) return <div className="mx-auto max-w-[760px] px-8 py-20"><Loading label="Loading post" /></div>;
 
@@ -87,7 +145,7 @@ export default function PostDetail() {
   return (
     <div className="mx-auto max-w-[760px] px-8 py-14">
       <Breadcrumbs
-        items={[{ name: "Feed", path: "/feed" }, { name: truncateAddress(post.creatorAddress), path: `/u/${post.creatorAddress}` }, { name: "Post" }]}
+        items={[{ name: "Feed", path: "/feed" }, { name: creatorName, path: `/u/${post.creatorAddress}` }, { name: "Post" }]}
       />
       <Card className="overflow-hidden">
         <div className="flex items-center gap-5 p-7">
@@ -99,7 +157,7 @@ export default function PostDetail() {
               to={`/u/${post.creatorAddress}`}
               className="font-mono text-[19px] font-semibold text-navy hover:text-brand"
             >
-              {truncateAddress(post.creatorAddress)}
+              {creatorName}
             </Link>
             <p className="text-[17px] text-muted">{timeAgo(post.createdAt)}</p>
           </div>
@@ -115,7 +173,7 @@ export default function PostDetail() {
         {image && (
           <img
             src={image}
-            alt={`Registered work attached to this post by ${truncateAddress(post.creatorAddress)}`}
+            alt={`Registered work attached to this post by ${creatorName}`}
             className="w-full object-cover"
           />
         )}
@@ -182,10 +240,10 @@ export default function PostDetail() {
 
                   {open && (
                     <div className="mt-6 flex flex-wrap gap-3">
-                      <Button size="sm" variant="danger" onClick={() => act(() => voteOnChallenge(c.challengeId, true), c.challengeId)} disabled={busy}>
+                      <Button size="sm" variant="danger" onClick={() => vote(c.challengeId, true)} disabled={busy}>
                         Guilty
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => act(() => voteOnChallenge(c.challengeId, false), c.challengeId)} disabled={busy}>
+                      <Button size="sm" variant="outline" onClick={() => vote(c.challengeId, false)} disabled={busy}>
                         Not guilty
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => act(() => resolveChallenge(c.challengeId), c.challengeId)} disabled={busy}>

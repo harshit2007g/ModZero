@@ -3,16 +3,31 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { motion, useScroll, useSpring } from "framer-motion";
 import { useAccount, useConnect, useDisconnect, useEnsName } from "wagmi";
 import { mainnet } from "wagmi/chains";
+import { useQuery } from "@tanstack/react-query";
 import Lenis from "lenis";
 import { Avatar, Button, truncateAddress } from "../ui";
 import { Wordmark } from "../brand/Logo";
 import { isOffline, onOfflineChange } from "../../lib/client";
+import { fetchDisplayName } from "../../lib/identity";
 
 
 export function useIdentity() {
   const { address, isConnected } = useAccount();
   const { data: ensName } = useEnsName({ address, chainId: mainnet.id });
-  return { address, ensName: ensName ?? null, isConnected };
+  // ModZero on-chain username takes priority over ENS. The query key mirrors
+  // useDisplayName so both share the same cache entry and never fire twice.
+  const { data: username } = useQuery({
+    queryKey: ["displayName", (address ?? "").toLowerCase()],
+    queryFn: () => fetchDisplayName(address ?? ""),
+    staleTime: Infinity,
+    enabled: !!address,
+  });
+  return {
+    address,
+    ensName: ensName ?? null,
+    isConnected,
+    displayName: username ?? ensName ?? null,
+  };
 }
 
 /**
@@ -66,23 +81,20 @@ function useSmoothScroll() {
 }
 
 function Wallet() {
-  const { address, ensName, isConnected } = useIdentity();
+  const { address, ensName, displayName, isConnected } = useIdentity();
   const { connect, connectors, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
-  const [hasProvider, setHasProvider] = useState(true);
 
   // `injected()` is always in the connectors list even with no wallet installed,
   // so clicking would fail silently. Check for a real provider instead.
-  useEffect(() => {
-    setHasProvider(typeof window !== "undefined" && "ethereum" in window);
-  }, []);
+  const [hasProvider] = useState(() => typeof window !== "undefined" && "ethereum" in window);
 
   if (isConnected && address) {
     return (
       <div className="flex items-center gap-3">
         <Avatar seed={ensName ?? address} size={38} />
         <span className="hidden text-[17px] font-semibold text-navy sm:block">
-          {ensName ?? truncateAddress(address)}
+          {displayName ?? truncateAddress(address)}
         </span>
         <Button variant="ghost" size="sm" onClick={() => disconnect()}>
           Sign out

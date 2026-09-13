@@ -12,9 +12,10 @@ import {
   generateContentId,
   generateCommitment,
 } from "@modzero/watermark";
-import { registerContentOnChain, createPostOnChain, getPostOnChain, getReputationOnChain } from "../services/blockchain.js";
+import { registerContentOnChain, createPostOnChain, getPostOnChain, getReputationOnChain, checkValidLicenseOnChain, createClaimOnChain, getClaimOnChain } from "../services/blockchain.js";
 import { saveContent } from "../database/contentRepo.js";
 import { savePost, getPostById, listPosts } from "../database/postRepo.js";
+import { findBestMatch, SIMILARITY_THRESHOLD } from "../services/matcher.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -44,10 +45,22 @@ router.post("/post", upload.single("image"), async (req, res) => {
     }
 
     let contentId: string | null = null;
+    // If the posted image resembles an already-registered image, this is its
+    // probable root. Captured BEFORE the new content is written so the match
+    // never "finds" the post's own freshly-registered copy.
+    let probableRootContentId: string | null = null;
+    let matchedSimilarity = 0;
 
     // Optional image — reuse the exact same pipeline as /content
     if (req.file) {
       contentId = generateContentId();
+
+      const bestMatch = await findBestMatch(req.file.buffer);
+      if (bestMatch) {
+        probableRootContentId = bestMatch.contentId;
+        matchedSimilarity = bestMatch.similarity;
+      }
+
       const secret = generateSecret();
       const fingerprint = await computeDHash(req.file.buffer);
       const watermarkMessage = `modzero:${contentId}`;
@@ -74,6 +87,46 @@ router.post("/post", upload.single("image"), async (req, res) => {
         hederaSequence: null,
         ethereumTxHash: imageTxHash,
       });
+    }
+
+    // Server-enforced authorization (spec §24-25): publishing content that
+    // matches an already-registered image requires a valid license, or a
+    // claim is opened automatically. No moderator — the evidence pipeline
+    // opens immediately so the stake consequence can settle deterministically.
+    // This mirrors what Compose did client-side, but can no longer be
+    // bypassed by calling the API directly.
+    let claimId: string | null = null;
+    if (contentId && probableRootContentId) {
+      const hasValidLicense = await checkValidLicenseOnChain(probableRootContentId, creatorAddress);
+      if (!hasValidLicense) {
+        claimId = ethers.hexlify(ethers.randomBytes(32));
+        const evidenceHash = ethers.keccak256(
+          ethers.toUtf8Bytes(`${contentId}:${probableRootContentId}:${creatorAddress}`)
+        );
+        const claimTxHash = await createClaimOnChain(
+          claimId,
+          contentId,
+          probableRootContentId,
+          creatorAddress,
+          evidenceHash
+        );
+        const onChainClaim = await getClaimOnChain(claimId);
+        await publishHcsEvent({
+          type: "CLAIM_CREATED",
+          version: 1,
+          claimId,
+          contentId,
+          rootContentId: probableRootContentId,
+          claimant: onChainClaim.claimant,
+          subject: creatorAddress,
+          evidenceHash,
+          timestamp: new Date().toISOString(),
+        });
+        console.warn(
+          `[POST /post] auto-opened claim ${claimId} (sim=${matchedSimilarity.toFixed(3)}) ` +
+            `against root ${probableRootContentId} for ${creatorAddress} (tx ${claimTxHash})`
+        );
+      }
     }
 
     const postId = ethers.hexlify(ethers.randomBytes(32));
@@ -103,7 +156,7 @@ router.post("/post", upload.single("image"), async (req, res) => {
 
 
     savePost(record);
-    res.status(201).json(record);
+    res.status(201).json({ ...record, claimId });
   } catch (err) {
     console.error("[POST /post] failed:", err);
     res.status(500).json({ error: "failed to create post" });

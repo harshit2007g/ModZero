@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useDisplayName } from "../../lib/identity";
 
 /* Type floor is 16px. Body is 20px. Nothing smaller than 16 ships. */
 
@@ -126,6 +127,30 @@ export function truncateAddress(address?: string | null, size = 6) {
   if (!address) return "—";
   if (!address.startsWith("0x") || address.length <= size * 2) return address;
   return `${address.slice(0, size)}…${address.slice(-4)}`;
+}
+
+/**
+ * Resolves a wallet address to a friendly name (ModZero username → ENS →
+ * truncated address) and renders it. Safe to use inside maps/lists — each
+ * instance owns its own lookup, and React Query deduplicates by address.
+ */
+export function ResolvedName({
+  address,
+  ensName,
+  className,
+  mono = true,
+}: {
+  address: string;
+  ensName?: string | null;
+  className?: string;
+  mono?: boolean;
+}) {
+  const name = useDisplayName(address);
+  return (
+    <span className={`${mono ? "font-mono " : ""}${className ?? ""}`}>
+      {name ?? ensName ?? truncateAddress(address)}
+    </span>
+  );
 }
 
 export function timeAgo(iso?: string | number | null) {

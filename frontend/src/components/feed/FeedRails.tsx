@@ -1,7 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import type { PostRecord } from "../../lib/api";
 import { communityCounts } from "../../lib/communities";
-import { Avatar, Button, Card, truncateAddress } from "../ui";
+import { Avatar, Button, Card, ResolvedName } from "../ui";
 import { CreateCommunityButton } from "./CreateCommunity";
 
 /** Left rail: the community directory. Shared by /feed and /m/:slug. */
@@ -110,9 +110,10 @@ export function StatsRail({ posts }: { posts: PostRecord[] }) {
                     className="flex items-center gap-3 transition-opacity hover:opacity-75"
                   >
                     <Avatar seed={address} size={40} />
-                    <span className="min-w-0 flex-1 truncate font-mono text-[16px] text-navy">
-                      {truncateAddress(address)}
-                    </span>
+                    <ResolvedName
+                      address={address}
+                      className="min-w-0 flex-1 truncate text-[16px] text-navy"
+                    />
                     <span className="shrink-0 text-[16px] font-semibold text-mint">
                       {rep > 0 ? "+" : ""}
                       {rep}

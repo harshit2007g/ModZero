@@ -13,21 +13,23 @@ contract UsernameRegistry {
 
     event UsernameRegistered(string username, address indexed owner);
 
-    /// @notice Registers `username` to `owner`. Callable by anyone acting
-    ///         on the owner's behalf (matches the same backend-relay
-    ///         pattern used elsewhere in ModZero — see blockchain.ts).
-    ///         No signature check for MVP simplicity; a production
-    ///         version would require the owner's own signed transaction.
-    function register(string calldata username, address owner) external {
+    /// @notice Registers `username` owned by the CALLER. Ownership is bound
+    ///         to msg.sender, so a username can never be registered for, or
+    ///         stolen from, another wallet: only the connected wallet can
+    ///         claim its own name (and pays for the tx). This matches the
+    ///         deployed registry (selector f2c298be, register(string)) and
+    ///         the frontend wallet-native flow — the backend has no way to
+    ///         mint usernames on anyone's behalf.
+    function register(string calldata username) external {
         require(bytes(username).length >= 3 && bytes(username).length <= 32, "username must be 3-32 characters");
         require(_isValidFormat(username), "username may only contain a-z, 0-9, and hyphens");
         require(usernameToOwner[username] == address(0), "username already registered");
-        require(bytes(ownerToUsername[owner]).length == 0, "address already owns a username");
+        require(bytes(ownerToUsername[msg.sender]).length == 0, "address already owns a username");
 
-        usernameToOwner[username] = owner;
-        ownerToUsername[owner] = username;
+        usernameToOwner[username] = msg.sender;
+        ownerToUsername[msg.sender] = username;
 
-        emit UsernameRegistered(username, owner);
+        emit UsernameRegistered(username, msg.sender);
     }
 
     /// @notice Forward resolution: username -> address. Returns

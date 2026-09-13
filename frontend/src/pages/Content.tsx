@@ -5,6 +5,7 @@ import { getContent, imageFor } from "../lib/client";
 import type { ContentRecord } from "../lib/api";
 import { useSeo } from "../components/seo/Seo";
 import Breadcrumbs from "../components/layout/Breadcrumbs";
+import { useDisplayName } from "../lib/identity";
 
 export default function Content() {
   useSeo({
@@ -16,6 +17,10 @@ export default function Content() {
   const { id } = useParams<{ id: string }>();
   const [record, setRecord] = useState<ContentRecord | null>(null);
   const [error, setError] = useState<unknown>(null);
+
+  // Username → live ENS → ENS stored on the record → truncated address.
+  const creatorName =
+    useDisplayName(record?.creatorAddress ?? "") ?? record?.ensName ?? truncateAddress(record?.creatorAddress ?? "");
 
   useEffect(() => {
     if (id) getContent(id).then(setRecord).catch(setError);
@@ -36,7 +41,7 @@ export default function Content() {
       <Card className="overflow-hidden">
         <img
           src={imageFor(record, record.contentId) ?? ""}
-          alt={`Registered work ${record.contentId} by ${record.ensName ?? truncateAddress(record.creatorAddress)}`}
+          alt={`Registered work ${record.contentId} by ${creatorName}`}
           className="w-full object-cover"
         />
       </Card>
@@ -45,7 +50,7 @@ export default function Content() {
         <div>
           <p className="text-[17px] text-muted">Registered {timeAgo(record.createdAt)} by</p>
           <p className="text-[26px] font-semibold tracking-tight text-navy">
-            {record.ensName ?? truncateAddress(record.creatorAddress)}
+            {creatorName}
           </p>
         </div>
         <Link to={`/license/${record.contentId}`}>

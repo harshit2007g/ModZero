@@ -106,7 +106,7 @@ router.post("/claim/:id/resolve", async (req, res) => {
     res.json({ claimId: req.params.id, ...onChainClaim, ethereumTxHash, hederaSequence });
   } catch (err) {
     console.error("[POST /claim/:id/resolve] failed:", err);
-    res.status(500).json({ error: err instanceof Error ? err.message : "failed to resolve claim" });
+    res.status(500).json({ error: "failed to resolve claim" });
   }
 });
 

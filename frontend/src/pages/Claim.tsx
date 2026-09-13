@@ -5,6 +5,7 @@ import { getClaim } from "../lib/client";
 import type { ClaimRecord } from "../lib/api";
 import { useSeo } from "../components/seo/Seo";
 import Breadcrumbs from "../components/layout/Breadcrumbs";
+import { useDisplayName } from "../lib/identity";
 
 export default function Claim() {
   useSeo({
@@ -16,6 +17,10 @@ export default function Claim() {
   const { id } = useParams<{ id: string }>();
   const [claim, setClaim] = useState<ClaimRecord | null>(null);
   const [error, setError] = useState<unknown>(null);
+
+  // Each party resolves to its OWN identity — never the connected wallet.
+  const claimantName = useDisplayName(claim?.claimant ?? "");
+  const subjectName = useDisplayName(claim?.subject ?? "");
 
   useEffect(() => {
     if (id) getClaim(id).then(setClaim).catch(setError);
@@ -43,7 +48,7 @@ export default function Claim() {
             <div>
               <p className="text-[17px] text-muted">Claimant</p>
               <p className="font-mono text-[18px] font-semibold text-navy">
-                {truncateAddress(claim.claimant)}
+                {claimantName ?? truncateAddress(claim.claimant)}
               </p>
             </div>
           </div>
@@ -53,7 +58,7 @@ export default function Claim() {
             <div>
               <p className="text-[17px] text-muted">Subject</p>
               <p className="font-mono text-[18px] font-semibold text-navy">
-                {truncateAddress(claim.subject)}
+                {subjectName ?? truncateAddress(claim.subject)}
               </p>
             </div>
           </div>

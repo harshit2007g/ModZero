@@ -29,7 +29,7 @@ async function main() {
   const MIN_STAKE = ethers.parseEther("0.001");
   const MIN_POST_STAKE = ethers.parseEther("0.0005");
   const MIN_CHALLENGE_STAKE = ethers.parseEther("0.0005");
-  const VOTING_PERIOD = 5 * 60; // 5 minutes — demo-friendly
+  const VOTING_PERIOD = 10; // 10sec — demo-friendly
   const MIN_QUORUM = 3;
 
   const ContentRegistry = await ethers.getContractFactory("ContentRegistry");

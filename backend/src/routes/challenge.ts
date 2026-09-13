@@ -7,6 +7,7 @@ import {
   getChallengeOnChain,
 } from "../services/blockchain.js";
 import { getPostById } from "../database/postRepo.js";
+import { saveChallengeIndex, listChallengeIndex } from "../database/challengeRepo.js";
 import { publishHcsEvent } from "../services/hedera.js";
 
 const router = Router();
@@ -17,6 +18,8 @@ const router = Router();
  * Anyone can challenge any post. Both challenger and (implicitly) the
  * post's creator have stake at risk — no moderator decides guilt, the
  * community does via /challenge/:id/vote (spec extension: challenges).
+ * The challenge is also recorded in the local index so it survives page
+ * reloads and can be listed per post (the chain has no enumeration).
  */
 router.post("/challenge", async (req, res) => {
   try {
@@ -40,6 +43,13 @@ router.post("/challenge", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
 
+    saveChallengeIndex({
+      challengeId,
+      postId,
+      createdAt: new Date().toISOString(),
+      ethereumTxHash,
+    });
+
     res.status(201).json({ challengeId, ...onChainChallenge, ethereumTxHash, hederaSequence });
   } catch (err) {
     console.error("[POST /challenge] failed:", err);
@@ -48,12 +58,36 @@ router.post("/challenge", async (req, res) => {
 });
 
 /**
+ * GET /challenges?postId=...
+ * Lists challenges the backend has created, hydrating each with its
+ * current on-chain state, newest first. Optional postId filters to the
+ * challenges of one post (used by the post detail page).
+ */
+router.get("/challenges", async (req, res) => {
+  try {
+    const postId = typeof req.query.postId === "string" && req.query.postId ? req.query.postId : undefined;
+    const indexed = listChallengeIndex(postId);
+
+    const hydrated = await Promise.all(
+      indexed.map(async (row) => {
+        const onChain = await getChallengeOnChain(row.challengeId);
+        return { challengeId: row.challengeId, ...onChain };
+      })
+    );
+
+    res.json(hydrated);
+  } catch (err) {
+    console.error("[GET /challenges] failed:", err);
+    res.status(500).json({ error: "failed to list challenges" });
+  }
+});
+
+/**
  * POST /challenge/:id/vote
  * Body: { guilty: boolean }
- * NOTE: this currently votes using the BACKEND's own wallet, not the
- * caller's — same known simplification as license/claim. A real frontend
- * integration would have the voter sign this themselves via their own
- * wallet. Fine for demo purposes; must be called out honestly if asked.
+ * Keep as a backend helper for polling/automation, but the live app votes
+ * WALLET-NATIVE from the voter's own wallet (see PostDetail.tsx) so each
+ * ballot is a distinct on-chain address and quorum is actually reachable.
  */
 router.post("/challenge/:id/vote", async (req, res) => {
   try {
@@ -65,7 +99,7 @@ router.post("/challenge/:id/vote", async (req, res) => {
     res.json({ challengeId: req.params.id, ...onChainChallenge, ethereumTxHash });
   } catch (err) {
     console.error("[POST /challenge/:id/vote] failed:", err);
-    res.status(500).json({ error: err instanceof Error ? err.message : "failed to vote" });
+    res.status(500).json({ error: "failed to vote" });
   }
 });
 
@@ -89,7 +123,7 @@ router.post("/challenge/:id/resolve", async (req, res) => {
     res.json({ challengeId: req.params.id, ...onChainChallenge, ethereumTxHash, hederaSequence });
   } catch (err) {
     console.error("[POST /challenge/:id/resolve] failed:", err);
-    res.status(500).json({ error: err instanceof Error ? err.message : "failed to resolve challenge" });
+    res.status(500).json({ error: "failed to resolve challenge" });
   }
 });
 

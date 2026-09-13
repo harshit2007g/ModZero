@@ -23,6 +23,19 @@ const CLAIM_REGISTRY_ABI = [
 const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY as string, provider);
 
+/**
+ * The backend relay that receives license payments and records licenses
+ * on-chain. It is the only principal that signs issueLicense transactions,
+ * and (per LicenseRegistry.issueLicense) it may only act as the licensor.
+ */
+export const LICENSOR_ADDRESS = wallet.address;
+
+/** The chain we actually talk to, so 402 payloads can tell clients what to switch to. */
+export async function getNetworkChainId(): Promise<number> {
+  const network = await provider.getNetwork();
+  return Number(network.chainId);
+}
+
 export const contentRegistry = new ethers.Contract(
   process.env.CONTENT_REGISTRY_ADDRESS as string,
   CONTENT_REGISTRY_ABI,
@@ -251,19 +264,41 @@ export async function resolveClaimOnChain(claimId: string, outcome: "VALID" | "I
  * be independently verified", not trusted because a client claims it
  * happened). Minimal x402-style flow: no formal x402 handshake headers,
  * but the core guarantee (verify on-chain before granting access) is real.
+ *
+ * Independently verifies, against the RPC, that the tx:
+ *  - exists and is on the expected chain (when chainId given)
+ *  - succeeded (status 1) and has the required confirmations
+ *  - was sent TO the expected payee FROM the expected requester
+ *  - transferred at least minValueWei
  */
 export async function verifyPaymentOnChain(
   txHash: string,
   expectedTo: string,
   expectedFrom: string,
-  minValueWei: bigint
+  minValueWei: bigint,
+  options: { chainId?: number; minConfirmations?: number; expectedData?: string } = {}
 ): Promise<{ valid: boolean; reason?: string }> {
   const tx = await provider.getTransaction(txHash);
   if (!tx) return { valid: false, reason: "transaction not found" };
 
+  if (options.chainId !== undefined && Number(tx.chainId ?? 0n) !== options.chainId) {
+    return {
+      valid: false,
+      reason: `transaction is on chain ${Number(tx.chainId ?? 0n)} but ${options.chainId} was required`,
+    };
+  }
+
   const receipt = await provider.getTransactionReceipt(txHash);
   if (!receipt || receipt.status !== 1) {
     return { valid: false, reason: "transaction not confirmed or failed" };
+  }
+
+  if (options.minConfirmations !== undefined && options.minConfirmations > 0) {
+    const latest = await provider.getBlockNumber();
+    const confirmations = latest - Number(receipt.blockNumber) + 1;
+    if (confirmations < options.minConfirmations) {
+      return { valid: false, reason: `transaction has ${confirmations} confirmations; need ${options.minConfirmations}` };
+    }
   }
 
   if (!tx.to || tx.to.toLowerCase() !== expectedTo.toLowerCase()) {
@@ -278,10 +313,25 @@ export async function verifyPaymentOnChain(
     return { valid: false, reason: "payment amount is insufficient" };
   }
 
+  if (options.expectedData !== undefined && (tx.data ?? "0x").toLowerCase() !== options.expectedData.toLowerCase()) {
+    return { valid: false, reason: "payment transaction is not bound to this content request" };
+  }
+
   return { valid: true };
 }
+
+/**
+ * Deterministic payload that binds a payment transfer to one specific
+ * content request. The wallet attaches this as `data` on its value
+ * transfer; step 2 verifies the same value, so a payment made for content A
+ * cannot later be presented against content B (plain ETH transfers carry no
+ * content intent otherwise).
+ */
+export function licenseBindingData(contentId: string, requester: string): string {
+  const message = `modzero:license:${contentId.toLowerCase()}:${requester.toLowerCase()}`;
+  return ethers.hexlify(ethers.toUtf8Bytes(message));
+}
 const USERNAME_REGISTRY_ABI = [
-  "function register(string calldata username, address owner) external",
   "function resolve(string calldata username) external view returns (address)",
   "function reverseResolve(address owner) external view returns (string memory)",
 ];
@@ -290,18 +340,6 @@ export const usernameRegistry = new ethers.Contract(
   USERNAME_REGISTRY_ABI,
   wallet
 );
-
-/**
- * Registers a username on-chain for the given address. Note: this uses
- * the BACKEND's wallet to sign the transaction (same known simplification
- * as license/claim/challenge elsewhere) — a production version would have
- * the user's own connected wallet sign this directly.
- */
-export async function registerUsernameOnChain(username: string, owner: string): Promise<string> {
-  const tx = await usernameRegistry.register(username, owner);
-  const receipt = await tx.wait();
-  return receipt.hash;
-}
 
 export async function resolveUsernameOnChain(username: string): Promise<string | null> {
   const address = await usernameRegistry.resolve(username);

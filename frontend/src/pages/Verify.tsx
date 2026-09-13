@@ -6,6 +6,7 @@ import { Avatar, Button, Card, ErrorNote, Pill, truncateAddress } from "../compo
 import { createClaim, getContent, imageFor, verifyContent } from "../lib/client";
 import type { ContentRecord, VerifyResult } from "../lib/api";
 import { useSeo } from "../components/seo/Seo";
+import { useDisplayName } from "../lib/identity";
 
 const EXPO = [0.16, 1, 0.3, 1] as const;
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -25,6 +26,10 @@ export default function Verify() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Original creator of the MATCHED work — not the connected wallet.
+  const rootName =
+    useDisplayName(root?.creatorAddress ?? "") ?? root?.ensName ?? truncateAddress(root?.creatorAddress ?? "");
 
   useEffect(() => {
     if (!file) return;
@@ -155,7 +160,7 @@ export default function Verify() {
                   <div className="min-w-0">
                     <p className="text-[17px] text-muted">Original creator</p>
                     <p className="text-[20px] font-semibold text-navy">
-                      {root.ensName ?? truncateAddress(root.creatorAddress)}
+                      {rootName}
                     </p>
                   </div>
                 </div>

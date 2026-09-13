@@ -73,7 +73,8 @@ describe("ClaimRegistry", function () {
 
     const claimantBalanceBefore = await ethers.provider.getBalance(claimant.address);
 
-    const tx = await claimRegistry.resolveClaim(claimId, 3); // RESOLVED_VALID
+    // Only the on-chain owner of the disputed content may settle VALID.
+    const tx = await claimRegistry.connect(other).resolveClaim(claimId, 3); // RESOLVED_VALID
     await expect(tx).to.emit(claimRegistry, "ClaimResolved").withArgs(claimId, 3, MIN_STAKE);
 
     const claimantBalanceAfter = await ethers.provider.getBalance(claimant.address);
@@ -82,6 +83,30 @@ describe("ClaimRegistry", function () {
     // Stake should now be zeroed on ContentRegistry — can't be slashed twice.
     const content = await contentRegistry.getContent(contentId);
     expect(content.stake).to.equal(0n);
+  });
+
+  it("rejects VALID resolution by anyone other than the disputed content's on-chain owner", async function () {
+    const { contentRegistry, claimRegistry, creator, claimant, other } = await deployFixture();
+    const { contentId, commitment, claimId } = makeIds("3-x");
+    const evidenceHash = ethers.keccak256(ethers.toUtf8Bytes("evidence"));
+
+    // "other" owns the disputed content.
+    await contentRegistry.connect(other).registerContent(contentId, commitment, ethers.ZeroHash, {
+      value: MIN_STAKE,
+    });
+    await claimRegistry.connect(claimant).createClaim(claimId, contentId, contentId, other.address, evidenceHash);
+
+    // The file-and-resolve attack: an unrelated caller ("creator") tries to
+    // settle a claim against content it does not own to drain the stake.
+    await expect(
+      claimRegistry.connect(creator).resolveClaim(claimId, 3) // RESOLVED_VALID
+    ).to.be.revertedWith("only the content owner can settle a VALID claim");
+
+    // The claim is still open and no stake has moved.
+    const claim = await claimRegistry.claims(claimId);
+    expect(claim.state).to.equal(1); // CREATED
+    const content = await contentRegistry.getContent(contentId);
+    expect(content.stake).to.equal(MIN_STAKE);
   });
 
   it("resolving RESOLVED_INVALID does not move any funds", async function () {

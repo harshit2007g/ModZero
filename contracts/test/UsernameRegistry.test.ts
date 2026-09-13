@@ -11,10 +11,10 @@ describe("UsernameRegistry", function () {
     return { registry, alice, bob };
   }
 
-  it("registers a valid username and resolves both directions", async function () {
+  it("registers a valid username owned by the caller and resolves both directions", async function () {
     const { registry, alice } = await deployFixture();
 
-    await expect(registry.connect(alice).register("harshit", alice.address))
+    await expect(registry.connect(alice).register("harshit"))
       .to.emit(registry, "UsernameRegistered")
       .withArgs("harshit", alice.address);
 
@@ -22,20 +22,33 @@ describe("UsernameRegistry", function () {
     expect(await registry.reverseResolve(alice.address)).to.equal("harshit");
   });
 
+  it("cannot register a username for another wallet (no impersonation)", async function () {
+    const { registry, alice, bob } = await deployFixture();
+
+    // Bob calls register() — the owner is forced to be Bob (msg.sender),
+    // so he can never squat a name onto Alice's address.
+    await expect(registry.connect(bob).register("alice"))
+      .to.emit(registry, "UsernameRegistered")
+      .withArgs("alice", bob.address);
+
+    expect(await registry.resolve("alice")).to.equal(bob.address);
+    expect(await registry.reverseResolve(alice.address)).to.equal("");
+  });
+
   it("rejects a username that's already taken", async function () {
     const { registry, alice, bob } = await deployFixture();
-    await registry.connect(alice).register("harshit", alice.address);
+    await registry.connect(alice).register("harshit");
 
-    await expect(registry.connect(bob).register("harshit", bob.address)).to.be.revertedWith(
+    await expect(registry.connect(bob).register("harshit")).to.be.revertedWith(
       "username already registered"
     );
   });
 
   it("rejects an address registering a second username", async function () {
     const { registry, alice } = await deployFixture();
-    await registry.connect(alice).register("harshit", alice.address);
+    await registry.connect(alice).register("harshit");
 
-    await expect(registry.connect(alice).register("harshit2", alice.address)).to.be.revertedWith(
+    await expect(registry.connect(alice).register("harshit2")).to.be.revertedWith(
       "address already owns a username"
     );
   });
@@ -43,10 +56,10 @@ describe("UsernameRegistry", function () {
   it("rejects usernames that are too short or too long", async function () {
     const { registry, alice } = await deployFixture();
 
-    await expect(registry.connect(alice).register("ab", alice.address)).to.be.revertedWith(
+    await expect(registry.connect(alice).register("ab")).to.be.revertedWith(
       "username must be 3-32 characters"
     );
-    await expect(registry.connect(alice).register("a".repeat(33), alice.address)).to.be.revertedWith(
+    await expect(registry.connect(alice).register("a".repeat(33))).to.be.revertedWith(
       "username must be 3-32 characters"
     );
   });
@@ -54,17 +67,17 @@ describe("UsernameRegistry", function () {
   it("rejects invalid characters", async function () {
     const { registry, alice } = await deployFixture();
 
-    await expect(registry.connect(alice).register("Harshit", alice.address)).to.be.revertedWith(
+    await expect(registry.connect(alice).register("Harshit")).to.be.revertedWith(
       "username may only contain a-z, 0-9, and hyphens"
     );
-    await expect(registry.connect(alice).register("harshit_2007", alice.address)).to.be.revertedWith(
+    await expect(registry.connect(alice).register("harshit_2007")).to.be.revertedWith(
       "username may only contain a-z, 0-9, and hyphens"
     );
   });
 
   it("allows hyphens and digits", async function () {
     const { registry, alice } = await deployFixture();
-    await expect(registry.connect(alice).register("harshit-2007", alice.address)).to.not.be.reverted;
+    await expect(registry.connect(alice).register("harshit-2007")).to.not.be.reverted;
   });
 
   it("returns address(0) and empty string for unregistered lookups", async function () {

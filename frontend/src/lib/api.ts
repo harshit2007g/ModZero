@@ -39,6 +39,9 @@ export interface LicenseRecord {
   currency: string;
   terms: { commercial: boolean; modification: boolean; attribution: boolean };
   ethereumTxHash: string;
+  /** Set when the backend returned an existing license instead of issuing a new one (idempotent retry / already licensed). */
+  alreadyIssued?: boolean;
+  alreadyLicensed?: boolean;
 }
 
 export interface ClaimRecord {
@@ -75,9 +78,22 @@ export async function getContent(contentId: string) {
   return handle<ContentRecord>(res);
 }
 
+export interface GraphNode {
+  contentId: string;
+  creator: string;
+  licenseStatus: string;
+  claimStatus: string;
+}
+
+export interface ContentGraph {
+  rootContentId: string;
+  nodes: GraphNode[];
+  edges: { from: string; to: string; relation?: string }[];
+}
+
 export async function getContentGraph(contentId: string) {
   const res = await fetch(`${API_BASE}/content/${contentId}/graph`);
-  return handle<{ rootContentId: string; nodes: any[]; edges: any[] }>(res);
+  return handle<ContentGraph>(res);
 }
 
 export async function verifyContent(file: File, requester: string) {
@@ -88,19 +104,47 @@ export async function verifyContent(file: File, requester: string) {
   return handle<VerifyResult>(res);
 }
 
+export interface PaymentRequiredResponse {
+  error: string;
+  payTo: string;
+  amountWei: string;
+  amount: string;
+  currency: string;
+  instructions: string;
+  contentId?: string;
+  chainId?: number;
+  network?: string;
+  /** Payload to attach as `data` on the payment transfer, binding it to this content request. */
+  paymentIntentData?: string;
+  /** Present when a claimed paymentTxHash could not be verified. */
+  reason?: string;
+}
+
+export type LicenseRequestResult =
+  | { status: "issued"; license: LicenseRecord }
+  | { status: "payment_required"; payment: PaymentRequiredResponse };
+
 export async function requestLicense(input: {
   contentId: string;
   requester: string;
   usage: "commercial" | "nonCommercial";
   intendsModification?: boolean;
   intendsPoliticalUse?: boolean;
-}) {
+  paymentTxHash?: string;
+}): Promise<LicenseRequestResult> {
   const res = await fetch(`${API_BASE}/license/request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  return handle<LicenseRecord>(res);
+
+  if (res.status === 402) {
+    const payment = (await res.json()) as PaymentRequiredResponse;
+    return { status: "payment_required", payment };
+  }
+
+  const license = await handle<LicenseRecord>(res);
+  return { status: "issued", license };
 }
 
 export async function getLicense(licenseId: string) {
@@ -192,6 +236,12 @@ export async function resolveChallenge(challengeId: string) {
 export async function getChallenge(challengeId: string) {
   const res = await fetch(`${API_BASE}/challenge/${challengeId}`);
   return handle<ChallengeRecord>(res);
+}
+
+export async function listChallenges(postId?: string) {
+  const qs = postId ? `?postId=${encodeURIComponent(postId)}` : "";
+  const res = await fetch(`${API_BASE}/challenges${qs}`);
+  return handle<ChallengeRecord[]>(res);
 }
 export function mediaUrl(mediaUri: string | null): string | null {
   if (!mediaUri) return null;
